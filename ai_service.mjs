@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import { getLlama, LlamaChatSession } from 'node-llama-cpp';
+import apiBridge from './api_bridge';
 
 const PORT = process.env.PORT || 4001;
 
@@ -199,52 +200,12 @@ app.post('/ai', async (req, res) => {
   try {
     const userInput = String(req.body.input || '').trim();
 
-    // Detectar modo de funciones desde request o config
-    let functionMode = req.body.functionMode ||
-      (req.body.llama_MCP_functions ? 'llama_MCP_functions' :
-        req.body.node_llama_cpp_MCP_functions ? 'node_llama_cpp_MCP_functions' :
-        req.body.node_llama_cpp_functions ? 'node_llama_cpp_functions' :
-        req.body.llama_functions ? 'llama_functions' :
-          req.body.useFunctions === false ? 'none' :
-            'none'); // Por defecto sin funciones para compatibilidad
+    const promptData = await apiBridge(req, res);
 
-    const fallbackMode = 'node_llama_cpp_MCP_functions';
-    if (functionMode === 'none') {
-      console.log(`⚠️ AI Service: Modo de funciones no especificado activando ${fallbackMode}!`);
-      functionMode = fallbackMode;
-    } else {
-      console.log(`🔍 AI Service: Modo de funciones detectado: ${functionMode}`);
+    if (promptData.mode == 'node' || promptData.payload) {
+      return res.json(promptData);
     }
 
-    // Si hay modo de funciones disponible, usar el plugin
-    if (functionMode !== 'none' && functionsPlugin) {
-      console.log(`🚀 AI Service: Iniciando modo '${functionMode}'!`);
-      const handler = await getFunctionHandler(functionMode);
-      if (handler) {
-        let userContext = '';
-        try {
-          userContext = req.body.context || '';
-        } catch (err) {
-          console.log("⚠️ AI Service: Error extrayendo contexto:", err.message)
-        }
-
-        console.log(`📨 AI Service: Procesando input con handler ${functionMode}: "${userInput}"`);
-        const result = await handler.chat(userInput, userContext);
-        console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}, result.answer:`, result.answer);
-        console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}`, "--------------------------");
-
-        return res.json({
-          answer: result.answer || result,
-          snippets: userContext ? userContext.split('\n').slice(0, 50) : [],
-          hadFunctionCalls: result.hadFunctionCalls || false,
-          mode: functionMode
-        });
-      } else {
-        console.log(`❌ AI Service: No se pudo obtener handler para modo '${functionMode}'`);
-      }
-    }
-
-    
     // Fallback: use shared handler or legacy mode
     console.log("AI Service: Processing request in fallback mode...");
     const systemContext = req.body.prompt || '';
