@@ -20,6 +20,8 @@
     "query:dev": "cd plugins/llama_functions && sh llama_functions_handler_test.sh",
     "query:dev:mcp": "cd plugins/llama_functions && sh llama_functions_mcp_handler_test.sh",
 
+    "query:oasis:mcp": "cd plugins/oasis_driver  && sh query.simple.mcp.sh",
+
     "gpu:local": "cd plugins && node node_llama_cpp_handler_test.mjs",
     "gpu:llama": "cd plugins && node llama_functions_handler_test.mjs",
     

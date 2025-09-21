@@ -424,7 +424,8 @@ export class NodeLLamaCppHandler {
         temperature: 0.7,
       });
 
-      console.log("\n\nBack from local model", result);
+      console.log("\n\nBack from local model. Raw", result.trim().substring(0, 300) + (result.length > 300 ? "..." : ""));
+      console.log("\n\nBack from local model. Raw------------------------------------------------------------------");
       // console.log("Function results captured:", this.lastFunctionResults);
 
       // ✅ Si hay resultados de función, generar respuesta natural
@@ -437,7 +438,7 @@ export class NodeLLamaCppHandler {
       }
 
       return {
-        answer: typeof result === "object" ? JSON.stringify(result, null, 2) || "No response generated" : String(result),
+        answer: typeof result === "object" ? JSON.stringify(result) || "No response generated" : result,
         hadFunctionCalls: Object.keys(usingFunctions).length > 0,
       };
     } catch (error) {

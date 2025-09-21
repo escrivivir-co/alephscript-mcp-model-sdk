@@ -231,6 +231,7 @@ app.post('/ai', async (req, res) => {
         console.log(`📨 AI Service: Procesando input con handler ${functionMode}: "${userInput}"`);
         const result = await handler.chat(userInput, userContext);
         console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}, result.answer:`, result.answer);
+        console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}`, "--------------------------");
 
         return res.json({
           answer: result.answer || result,
