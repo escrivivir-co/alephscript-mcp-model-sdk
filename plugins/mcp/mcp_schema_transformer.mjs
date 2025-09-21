@@ -1,14 +1,8 @@
-/**
- * Transformador de schemas MCP a formato node-llama-cpp functions
- */
 export class MCPSchemaTransformer {
   constructor(serverName = 'mcp-server') {
     this.serverName = this.sanitizeServerName(serverName);
   }
 
-  /**
-   * Sanitizar nombre del servidor para uso en nombres de función
-   */
   sanitizeServerName(name) {
     return name
       .toLowerCase()
@@ -18,7 +12,7 @@ export class MCPSchemaTransformer {
   }
 
   /**
-   * Transformar una tool MCP a formato node-llama-cpp function
+   * From tool MCP 2 node-llama-cpp function
    */
   transformTool(tool) {
     if (!tool.name || !tool.description) {

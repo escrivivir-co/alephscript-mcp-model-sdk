@@ -1,74 +1,48 @@
 import { NodeLLamaCppHandler, NODE_LLAMA_CPP_CONFIGS } from './node_llama_cpp_handler.mjs';
 import { MCPMixin } from '../mcp/MCPMixin.mjs';
 
-/**
- * Handler MCP que extiende NodeLLamaCppHandler para usar node-llama-cpp nativo
- * con funciones MCP. Más simple que la implementación manual.
- */
+
+export function mixMCPMixin(target) {
+  // Aplicar MCPMixin correctamente
+  const mcpMixin = new MCPMixin();
+
+  // Copiar todas las propiedades del mixin
+  Object.assign(target, mcpMixin);
+
+  // Copiar todos los métodos del prototype del mixin
+  const mcpProto = Object.getPrototypeOf(mcpMixin);
+  Object.getOwnPropertyNames(mcpProto).forEach(name => {
+    if (name !== 'constructor' && typeof mcpProto[name] === 'function') {
+      target[name] = mcpProto[name].bind(target);
+    }
+  });
+
+
+}
+
 export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
   constructor(config = {}) {
     super(config);
-    
-    // Aplicar MCPMixin correctamente
-    const mcpMixin = new MCPMixin();
-    
-    // Copiar todas las propiedades del mixin
-    Object.assign(this, mcpMixin);
-    
-    // Copiar todos los métodos del prototype del mixin
-    const mcpProto = Object.getPrototypeOf(mcpMixin);
-    Object.getOwnPropertyNames(mcpProto).forEach(name => {
-      if (name !== 'constructor' && typeof mcpProto[name] === 'function') {
-        this[name] = mcpProto[name].bind(this);
-      }
-    });
-    
-    // Procesar functionSets usando NODE_LLAMA_CPP_CONFIGS
-    const { functionSets = [] } = config;
-    this.initializeLocalFunctions(functionSets);
+
+    mixMCPMixin(this); // ???
+
   }
 
-  /**
-   * Inicializar funciones locales usando NODE_LLAMA_CPP_CONFIGS
-   */
-  initializeLocalFunctions(functionSets) {
-    if (functionSets.length > 0) {
-      functionSets.forEach(setName => {
-        if (NODE_LLAMA_CPP_CONFIGS[setName]) {
-          this.registerFunctions(NODE_LLAMA_CPP_CONFIGS[setName]);
-          console.log(`✅ Funciones locales registradas: ${setName}`);
-        } else {
-          console.warn(`⚠️ Set de funciones desconocido: ${setName}`);
-        }
-      });
-      // Limpiar functionSets para evitar duplicación en super.initFunctions()
-      this.functionSets = [];
-    }
-  }
+  async intialize() {
 
-  /**
-   * Inicializar funciones incluyendo MCP
-   */
-  initFunctions() {
-    // Primero registrar funciones locales
-    super.initFunctions();
-    
-    // Luego agregar funciones MCP
+    await super.initialize();    
     this._addMCPFunctions();
-    
-    console.log(`🔧 NodeLLamaCppMCPHandler: Total de funciones: ${this.functions.size}`);
+
   }
 
-  /**
-   * Agregar funciones MCP al registro de funciones
-   */
   _addMCPFunctions() {
     const mcpFunctionMap = this._buildMCPFunctionMapping();
-    
-    // Integrar funciones MCP con node-llama-cpp usando prefijos cortos
+
+    // For SLMs that needs listing the functions on prompts
+    // all functions are prefixed with short server name
     for (const [shortFunctionName, functionDef] of Object.entries(mcpFunctionMap)) {
       const serverInfo = this.functionToServerMap.get(shortFunctionName);
-      
+
       // Registrar función con interceptación MCP
       this.registerMCPFunction(shortFunctionName, {
         description: functionDef.description,
@@ -76,22 +50,18 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
         serverInfo: serverInfo
       });
     }
-    
-    console.log(`🔧 NodeLLamaCppMCPHandler: Funciones MCP agregadas con prefijos cortos`);
+
+    console.log(`🔧 NodeLLamaCppMCPHandler: Added MCP functions`);
   }
 
-  /**
-   * Registrar una función MCP con interceptación
-   */
-  registerMCPFunction(name, config) {
+ registerMCPFunction(name, config) {
     const { description, parameters, serverInfo } = config;
-    
-    // Crear handler interceptado que ejecuta en MCP usando el mixin
+
     const mcpHandler = async (params) => {
       console.log(`🔄 NodeLLamaCppMCPHandler: execute ${name} -> ${serverInfo.toolName} at ${serverInfo.serverName}`);
-      
+
       try {
-        // Usar el método del mixin para ejecutar
+        // Mixing method
         const result = await this.executeMCPFunction(name, params);
         console.log(`✅ NodeLLamaCppMCPHandler: ${name} succeded!`);
         return result;
@@ -109,7 +79,7 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
     };
 
     this.functions.set(name, nodeLlamaFunction);
-    // console.log(`🔧 NodeLLamaCppMCPHandler: Función MCP registrada: ${name}`);
+    // console.log(`🔧 NodeLLamaCppMCPHandler: registered: ${name}`);
   }
 
   /**
@@ -118,9 +88,9 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
   getFunctionStats() {
     const localCount = Array.from(this.functions.keys()).filter(name => !name.includes('_')).length;
     const mcpCount = Array.from(this.functions.keys()).filter(name => name.includes('_')).length;
-    
+
     const mcpStats = this.getMCPStats();
-    
+
     return {
       local: {
         count: localCount,
@@ -141,7 +111,7 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
   async exportConfiguration() {
     const stats = this.getFunctionStats();
     const mcpConfig = this.exportMCPConfiguration();
-    
+
     return {
       type: 'mcp-native',
       timestamp: new Date().toISOString(),
@@ -181,9 +151,9 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
 /**
  * Factory function para crear handler MCP nativo preconfigurado
  */
-export async function createMCPModelHandler(config = {}) {
-  console.log('🏭 CreateMCPModelHandler: Iniciando creación con config:', Object.keys(config));
-  
+async function createMCPModelHandler(config = {}) {
+  console.log('🏭 CreateMCPModelHandler: config:', Object.keys(config));
+
   const {
     modelPath,
     functionSets = ['fruits', 'system'],
@@ -191,27 +161,25 @@ export async function createMCPModelHandler(config = {}) {
     ...llamaConfig
   } = config;
 
-  console.log('🏭 CreateMCPModelHandler: Creando instancia de NodeLLamaCppMCPHandler...');
+  console.log('🏭 CreateMCPModelHandler: NodeLLamaCppMCPHandler...');
   const handler = new NodeLLamaCppMCPHandler({
     modelPath,
     functionSets,
     ...llamaConfig
   });
 
-  // Registrar servidores MCP ANTES de inicializar
   if (mcpServers.length > 0) {
-    console.log(`🏭 CreateMCPModelHandler: Registrando ${mcpServers.length} servidores MCP...`);
-    
+    console.log(`🏭 CreateMCPModelHandler: MCP Servers ${mcpServers.length}...`);
+
     const mcpResult = await handler.registerMCPServers(mcpServers);
-    console.log(`✅ CreateMCPModelHandler: ${mcpResult.registered} servidores registrados, ${mcpResult.errors} errores`);
+    console.log(`✅ CreateMCPModelHandler: Registered ${mcpResult.registered} MCP servers, ${mcpResult.errors} errors`);
   }
-  
-  // AHORA inicializar con todas las funciones disponibles
-  console.log('🏭 CreateMCPModelHandler: inicialización del handler...');
+
+  console.log('🏭 CreateMCPModelHandler: initializing handler...');
   await handler.initialize();
-  
-  console.log(`✅ CreateMCPModelHandler: Handler MCP nativo creado con ${handler.getFunctionStats().total} funciones`);
-  
+
+  console.log(`✅ CreateMCPModelHandler: Handler MCP created with ${handler.getFunctionStats().total} functions`);
+
   return handler;
 }
 
@@ -242,7 +210,7 @@ export const MCP_MODEL_PRESETS = {
       }
     ]
   },
-  
+
   // Configuración completa con múltiples servidores
   full: {
     functionSets: ['fruits', 'system'],

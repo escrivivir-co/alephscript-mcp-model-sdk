@@ -6,9 +6,6 @@ import {
   StreamableHTTPClientTransport 
 } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-/**
- * Cliente MCP para extraer tools y metadata de servidores
- */
 export class MCPToolsExtractor {
   constructor() {
     this.client = null;
@@ -17,14 +14,9 @@ export class MCPToolsExtractor {
     this.isConnected = false;
   }
 
-  /**
-   * Conectar a un servidor MCP
-   * @param {string|object} serverConfig - URL o configuración del servidor
-   * @param {string} transportType - Tipo de transporte: 'stdio', 'http'
-   */
   async connectToServer(serverConfig, transportType = 'http') {
     try {
-      // Crear transporte según el tipo
+
       if (transportType === 'stdio') {
         if (typeof serverConfig === 'string') {
           throw new Error('stdio transport requires command and args configuration');
@@ -36,7 +28,7 @@ export class MCPToolsExtractor {
         });
       } else if (transportType === 'http' || transportType === 'sse') {
         const url = typeof serverConfig === 'string' ? serverConfig : serverConfig.url;
-        // Crear URL base con /mcp como en MCPClientDriver
+
         const baseUrl = new URL(`${url}/mcp`);
         this.transport = new StreamableHTTPClientTransport(baseUrl);
       } else {
@@ -84,12 +76,9 @@ export class MCPToolsExtractor {
     }
   }
 
-  /**
-   * Listar todas las tools disponibles con sus esquemas
-   */
   async listTools() {
     if (!this.isConnected || !this.client) {
-      throw new Error('Cliente MCP no conectado');
+      throw new Error('Client not connected! use connectToServer first!');
     }
 
     try {
@@ -101,9 +90,6 @@ export class MCPToolsExtractor {
     }
   }
 
-  /**
-   * Listar recursos disponibles
-   */
   async listResources() {
     if (!this.isConnected || !this.client) {
       throw new Error('Cliente MCP no conectado');
@@ -118,9 +104,6 @@ export class MCPToolsExtractor {
     }
   }
 
-  /**
-   * Listar prompts disponibles
-   */
   async listPrompts() {
     if (!this.isConnected || !this.client) {
       throw new Error('Cliente MCP no conectado');
@@ -135,9 +118,6 @@ export class MCPToolsExtractor {
     }
   }
 
-  /**
-   * Llamar a una tool específica
-   */
   async callTool(name, arguments_ = {}) {
     if (!this.isConnected || !this.client) {
       throw new Error('Cliente MCP no conectado');
@@ -155,9 +135,6 @@ export class MCPToolsExtractor {
     }
   }
 
-  /**
-   * Extraer metadata completa del servidor
-   */
   async extractCompleteMetadata() {
     if (!this.isConnected) {
       throw new Error('Cliente MCP no conectado');
@@ -183,9 +160,6 @@ export class MCPToolsExtractor {
     }
   }
 
-  /**
-   * Cerrar conexión
-   */
   async disconnect() {
     if (this.client && this.isConnected) {
       try {
@@ -198,9 +172,6 @@ export class MCPToolsExtractor {
     }
   }
 
-  /**
-   * Obtener nombre del servidor para prefijos de funciones
-   */
   getServerName() {
     if (this.serverInfo?.url) {
       // Extraer hostname de la URL

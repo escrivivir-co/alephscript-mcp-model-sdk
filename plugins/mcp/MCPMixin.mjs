@@ -105,19 +105,14 @@ export class MCPMixin {
     return serverName.toLowerCase().substring(0, 4);
   }
 
-  /**
-   * Construir mapeo de funciones MCP con prefijos cortos
-   */
   _buildMCPFunctionMapping() {
     const mcpFunctions = this.mcpHandler.getAllFunctions();
     const mcpFunctionMap = {};
     
-    // Limpiar mapeo de funciones a servidores
     this.functionToServerMap.clear();
     
-    // Integrar funciones MCP con prefijos cortos
     for (const [originalServerName, serverFunctions] of Object.entries(mcpFunctions)) {
-      // Buscar el nombre real del servidor en nuestro registro
+
       let actualServerName = originalServerName;
       
       for (const [registeredName, serverInfo] of this.mcpServers.entries()) {
@@ -127,11 +122,10 @@ export class MCPMixin {
         }
       }
       
-      // Generar prefijo corto para el servidor
       const shortPrefix = this._generateShortPrefix(actualServerName);
       
       for (const [toolName, functionDef] of Object.entries(serverFunctions)) {
-        // Crear función con prefijo corto
+
         const shortFunctionName = `${shortPrefix}_${toolName}`;
         
         mcpFunctionMap[shortFunctionName] = {
@@ -140,7 +134,6 @@ export class MCPMixin {
           handler: functionDef.handler
         };
         
-        // Mapear función a información del servidor para routing
         this.functionToServerMap.set(shortFunctionName, {
           serverName: actualServerName,
           originalServerName: originalServerName,

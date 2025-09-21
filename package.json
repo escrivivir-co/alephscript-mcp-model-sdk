@@ -34,7 +34,7 @@
     "test:all-gpu": "npm run gpu:check && npm run gpu:test-simple && npm run test:functions",
     "llama:dryrun": "node plugins/system/llama_dryrun.mjs",
     
-    "query-server": "node plugins/mcp_query_server.mjs",
+    "experimental:inpsector:target": "node plugins/mcp_query_server.mjs",
     "test:mcp": "node plugins/test_mcp_integration.mjs",
     
     "diagnostic": "npm run gpu:check",

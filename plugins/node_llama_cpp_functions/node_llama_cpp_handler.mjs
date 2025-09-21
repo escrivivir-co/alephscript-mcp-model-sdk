@@ -12,11 +12,7 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/**
- * Configuraciones predefinidas de funciones para node-llama-cpp
- */
 export const NODE_LLAMA_CPP_CONFIGS = {
-  // Funciones de ejemplo para frutas
   fruits: {
     getFruitPrice: {
       description: "Get the price of a fruit",
@@ -47,7 +43,6 @@ export const NODE_LLAMA_CPP_CONFIGS = {
     },
   },
 
-  // Funciones de utilidades del sistema
   system: {
     getCurrentTime: {
       description: "Get the current date and time",
@@ -111,9 +106,7 @@ export const NODE_LLAMA_CPP_CONFIGS = {
     },
   },
 };
-/**
- * Chat wrapper personalizado para el modelo local
- */
+
 class MyCustomChatWrapper extends ChatWrapper {
   wrapperName = "MyCustomChat";
   userContext = "";
@@ -239,10 +232,6 @@ class MyCustomChatWrapper extends ChatWrapper {
   }
 }
 
-/**
- * Clase para manejar el modelo local legacy
- */
-
 export class NodeLLamaCppHandler {
   constructor(config = {}) {
     this.llamaInstance = null;
@@ -253,9 +242,9 @@ export class NodeLLamaCppHandler {
     this.modelPath = config.modelPath;
     this.functions = new Map();
     this.functionSets = config.functionSets;
-    this.gpu = config.gpu !== false; // Por defecto habilitada, se deshabilita explícitamente
+    this.gpu = config.gpu !== false; 
     this.gpuLayers = config.gpuLayers; // Undefined = automático
-    this.vramPadding = config.vramPadding || 256; // 256MB de padding para GPU grande la mitad para normales --> es la cantidad de megas que no usará y así evitará colapsar la gpu
+    this.vramPadding = config.vramPadding || 256; 
   }
 
   async initialize() {
@@ -276,14 +265,12 @@ export class NodeLLamaCppHandler {
       throw new Error("Failed to initialize llama instance");
     }
 
-    this.initFunctions();
+    this.initInternalFunctions();
 
-    // Mostrar estadísticas del modelo
     if (this.model) {
       console.log(`Context size: ${this.context.contextSize}`);
       console.log(`Threads: ${this.context.threadCount || 'auto'}`);
 
-      // Verificar que el tokenizer esté disponible
       try {
         await this.model.tokenize("test");
         console.log("✅ Tokenizer working correctly");
@@ -352,11 +339,12 @@ export class NodeLLamaCppHandler {
     console.log("Local model initialized successfully");
     console.log(`Model loaded with GPU: ${this.gpu ? 'YES' : 'NO'}`);
   }
-  initFunctions() {
-    // Registrar sets de funciones solicitados
+
+  initInternalFunctions() {
+
     this.functionSets.forEach((setName) => {
       if (NODE_LLAMA_CPP_CONFIGS[setName]) {
-        this.registerFunctions(NODE_LLAMA_CPP_CONFIGS[setName]);
+        this.configureInternalFunctions(NODE_LLAMA_CPP_CONFIGS[setName]);
       } else {
         console.warn(`Local function set '${setName}' not found`);
       }
@@ -374,7 +362,6 @@ export class NodeLLamaCppHandler {
       await this.initialize();
     }
 
-    // Verificar que todos los componentes estén disponibles
     if (!this.session) {
       throw new Error("Chat session not initialized");
     }
@@ -393,7 +380,6 @@ export class NodeLLamaCppHandler {
 
     this.wrapper.userContext = context || "";
 
-    // ✅ Limpiar resultados anteriores
     this.lastFunctionResults = [];
 
     const usingFunctions = functions || this.getFunctionsForNodeLlamaWithInterception();
@@ -447,20 +433,16 @@ export class NodeLLamaCppHandler {
     }
   }
 
-  /**
-   * Crear funciones con interceptación
-   */
   getFunctionsForNodeLlamaWithInterception() {
     const functionsObj = {};
     this.functions.forEach((func, name) => {
       functionsObj[name] = {
         ...func,
         handler: async (params) => {
-          // ✅ Interceptar llamada
+
           console.log(`🔧 Function called: ${name}`, params);
           const result = await func.handler(params);
 
-          // ✅ Guardar resultado
           this.lastFunctionResults.push({
             name,
             params,
@@ -475,9 +457,6 @@ export class NodeLLamaCppHandler {
     return functionsObj;
   }
 
-  /**
-   * Generar respuesta natural a partir de los resultados interceptados
-   */
   generateNaturalResponseFromResults() {
     const lastResult =
       this.lastFunctionResults[this.lastFunctionResults.length - 1];
@@ -504,11 +483,8 @@ export class NodeLLamaCppHandler {
     return String(result);
   }
 
-  /**
-   * Registrar una función
-   */
-  registerFunction(name, config) {
-    // Convertir al formato esperado por node-llama-cpp
+  addInternalFunctionsToMap(name, config) {
+    // parse to node-llama-cpp format
     const nodeLlamaFunction = {
       description: config.description,
       params: config.parameters,
@@ -519,18 +495,12 @@ export class NodeLLamaCppHandler {
     console.log(`Local function registered: ${name}`);
   }
 
-  /**
-   * Registrar múltiples funciones desde configuración
-   */
-  registerFunctions(functionsConfig) {
+  configureInternalFunctions(functionsConfig) {
     Object.entries(functionsConfig).forEach(([name, config]) => {
-      this.registerFunction(name, config);
+      this.addInternalFunctionsToMap(name, config);
     });
   }
 
-  /**
-   * Convertir funciones al formato de node-llama-cpp
-   */
   getFunctionsForNodeLlama() {
     const functionsObj = {};
     this.functions.forEach((func, name) => {
