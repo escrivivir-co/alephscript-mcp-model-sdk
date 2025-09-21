@@ -113,11 +113,12 @@ class LocalFunctionChatWrapper extends ChatWrapper {
  */
 export class LlamaFunctionHandler {
   constructor(config = {}) {
+    this.llamaInstance = null;
     this.modelPath = config.modelPath;
     this.gpu = config.gpu !== false; // Por defecto habilitada
     this.gpuLayers = config.gpuLayers; // undefined = automático
     this.vramPadding = config.vramPadding || 256; // 256MB de padding para GPU grande la mitad para normales --> es la cantidad de megas que no usará y así evitará colapsar la gpu
-    this.llamaInstance = null;
+
     this.model = null;
     this.context = null;
     this.session = null;
@@ -134,13 +135,48 @@ export class LlamaFunctionHandler {
       return;
     }
 
+    // Check if model file exists first
+    const fs = await import('fs');
+    if (!fs.existsSync(this.modelPath)) {
+      throw new Error(`Model file not found at: ${this.modelPath}`);
+    }
+
+    if (!this.llamaInstance) {
+      await this.initializeLlamaInstance();
+    }
+
+    if (!this.llamaInstance) {
+      throw new Error("Failed to initialize llama instance");
+    }
+
+    this.ready = true;
+    console.log(`Local model initialized!`);
+    console.log(`Using GPU: ${this.gpu ? 'YES' : 'NO'}`);
+    console.log(`Context size: ${this.context.contextSize}`);
+    console.log(`Threads: ${this.context.threadCount || 'auto'}`);
+
+    // Verificar que el tokenizer esté disponible
+    try {
+      await this.model.tokenize("test");
+      console.log("✅ Tokenizer working correctly");
+    } catch (error) {
+      console.warn("⚠️ Tokenizer issue:", error.message);
+    }
+
+    // Log de uso de VRAM si está disponible
+    if (this.gpu) {
+      console.log('🎯 GPU acceleration enabled - model should run faster!');
+    }
+  }
+
+  async initializeLlamaInstance() {
+
     console.log("Initializing local Llama model...");
     console.log(`Model path: ${this.modelPath}`);
     console.log(`GPU enabled: ${this.gpu}`);
     console.log(`GPU layers: ${this.gpuLayers || 'auto'}`);
     console.log(`VRAM padding: ${this.vramPadding}MB`);
 
-    // � DEFINITIVO: Prohibir compilación completamente
     this.llamaInstance = await getLlama({
       gpu: this.gpu,
       vramPadding: this.vramPadding,
@@ -160,40 +196,40 @@ export class LlamaFunctionHandler {
       gpuLayers: this.gpuLayers, // undefined = automático, 0 = solo CPU
     });
 
+    if (!this.model) {
+      throw new Error("Failed to load model");
+    }
+
     console.log("Creating context...");
     this.context = await this.model.createContext({
       threads: this.gpu ? 1 : 4, // Menos hilos para GPU, más para CPU
       contextSize: 4096, // Aumentado para mejor contexto
     });
 
+    if (!this.context) {
+      throw new Error("Failed to create context");
+    }
+
     this.wrapper = new LocalFunctionChatWrapper();
     console.log("Creating chat session...");
+
+    // Create context sequence first
+    const contextSequence = this.context.getSequence();
+    console.log("🔍 Debug - Context sequence created:", !!contextSequence);
+
     this.session = new LlamaChatSession({
-      contextSequence: this.context.getSequence(),
+      contextSequence: contextSequence,
       chatWrapper: this.wrapper,
       autoDisposeSequence: false, // Evitar disposal automático
     });
 
-    this.ready = true;
-    console.log(`Local model initialized!`);
-    console.log(`Using GPU: ${this.gpu ? 'YES' : 'NO'}`);
-    console.log(`Context size: ${this.context.contextSize}`);
-    console.log(`Threads: ${this.context.threadCount || 'auto'}`);
-    
-    // Verificar que el tokenizer esté disponible
-    try {
-      await this.model.tokenize("test");
-      console.log("✅ Tokenizer working correctly");
-    } catch (error) {
-      console.warn("⚠️ Tokenizer issue:", error.message);
+    if (!this.session) {
+      throw new Error("Failed to create chat session");
     }
-    
-    // Log de uso de VRAM si está disponible
-    if (this.gpu) {
-      console.log('🎯 GPU acceleration enabled - model should run faster!');
-    }
-  }
 
+    console.log("🔍 Debug - Session created successfully:", !!this.session);
+
+  }
   /**
    * Registrar una función
    */
@@ -237,10 +273,22 @@ export class LlamaFunctionHandler {
       await this.initialize();
     }
 
-    // Verificar que la sesión esté disponible
+    // Verificar que todos los componentes estén disponibles
     if (!this.session) {
       throw new Error("Chat session not initialized");
     }
+    
+    if (!this.model) {
+      throw new Error("Model not initialized");
+    }
+    
+    if (!this.context) {
+      throw new Error("Context not initialized");
+    }
+
+    console.log("🔍 Debug - Model available:", !!this.model);
+    console.log("🔍 Debug - Context available:", !!this.context);
+    console.log("🔍 Debug - Session available:", !!this.session);
 
     // ✅ Corregir: usar systemContext en lugar de context indefinido
     this.wrapper.userContext = systemContext;
@@ -310,7 +358,7 @@ export class LlamaFunctionHandler {
       ]);
 
       console.log("\n✅ Model inference completed!");
-      console.log("\nLocal model raw response:", answer);
+      console.log("\nLocal model raw response:", (answer || "").trim().substring(0, 300) + "...");
 
       // Buscar y procesar llamadas a funciones manualmente
       const processedAnswer = await this.processFunctionCalls(answer);
@@ -341,7 +389,7 @@ export class LlamaFunctionHandler {
    * Procesar llamadas a funciones en el texto (similar a Ollama)
    */
   async processFunctionCalls(text) {
-    console.log("\n🔍 Looking for function calls in:", text);
+    console.log("\n🔍 Looking for function calls in:", text.trim().substring(0, 300) + "...");
 
     const functionCallRegex = /\[\[call:\s*(\w+)\((.*?)\)\]\]/g;
     let processedText = text;
@@ -436,13 +484,13 @@ export class LlamaFunctionHandler {
       // console.log("📝 Original query:", originalQuery);
       // console.log("📊 Function results:", functionResults.replace(/\s+/g, ' ').substring(0, 200) + "...");
       console.log("📊 Function results length:", functionResults.length);
-      
+
       // Regex más robusto para capturar resultados multi-línea
       const resultMatch = functionResults.match(/\[\[result:\s*(\{[\s\S]*?\})\s*\]\]/);
       if (!resultMatch) {
         console.log("❌ No result pattern found in function results");
         console.log("🔍 Trying simpler regex...");
-        
+
         // Intentar regex más simple
         const simpleMatch = functionResults.match(/\[\[result:\s*(.*?)\s*\]\]/s);
         if (!simpleMatch) {
@@ -450,7 +498,7 @@ export class LlamaFunctionHandler {
           return "Function executed successfully, but no result data available.";
         }
         console.log("✅ Simple regex found match:", simpleMatch[1].substring(0, 100) + "...");
-        
+
         let functionData;
         try {
           functionData = JSON.parse(simpleMatch[1]);
@@ -459,10 +507,10 @@ export class LlamaFunctionHandler {
           console.log("⚠️ Simple regex data not JSON, using raw data");
           functionData = simpleMatch[1];
         }
-        
+
         // Crear prompt para respuesta natural
         const responsePrompt = this.createResponsePrompt(originalQuery, functionData);
-        
+
         console.log("\n🔄 Generating natural response with prompt:");
         console.log("=" + "=".repeat(50));
         console.log(responsePrompt);
@@ -494,7 +542,7 @@ export class LlamaFunctionHandler {
 
       // Crear prompt para respuesta natural
       const responsePrompt = this.createResponsePrompt(originalQuery, functionData);
-      
+
       // console.log("🔄 Generating natural response with prompt (truncated for readability)");
       // console.log("=" + "=".repeat(50));
       // console.log(responsePrompt);
@@ -515,7 +563,7 @@ export class LlamaFunctionHandler {
     } catch (error) {
       console.error("❌ Error generating natural response:", error);
       console.error("🔍 Error stack:", error.stack);
-      
+
       // Fallback: crear respuesta simple basada en el tipo de datos
       const fallbackResponse = this.createFallbackResponse(originalQuery, functionResults);
       console.log("🔄 Using fallback response:", fallbackResponse);
@@ -531,11 +579,11 @@ export class LlamaFunctionHandler {
     console.log("📝 Query:", originalQuery);
     console.log("📊 Function data type:", typeof functionData);
     console.log("📄 Function data:", functionData);
-    
+
     // Analizar la estructura de los datos para generar un prompt inteligente
     const dataAnalysis = this.analyzeFunctionData(functionData);
     // console.log("🔍 Data analysis result:", dataAnalysis);
-    
+
     // Crear prompt adaptativo basado en el análisis
     const prompt = `You are an AI assistant helping a user understand information. The user asked: "${originalQuery}"
 
@@ -568,7 +616,7 @@ Respond naturally as if you're explaining this information to a colleague:`;
     // console.log("\n🔍 Analyzing function data...");
     // console.log("📊 Raw data:", data);
     // console.log("📈 Data type:", typeof data);
-    
+
     if (typeof data === 'string') {
       console.log("🔄 Attempting to parse string as JSON...");
       try {
@@ -604,7 +652,7 @@ Respond naturally as if you're explaining this information to a colleague:`;
       dataType = 'list';
       structure = `array with ${data.length} items`;
       keyInfo.push(`${data.length} items`);
-      
+
       // Analizar el primer elemento si existe
       if (data.length > 0) {
         const firstItem = data[0];
@@ -623,7 +671,7 @@ Respond naturally as if you're explaining this information to a colleague:`;
 
       keys.forEach(key => {
         const lowerKey = key.toLowerCase();
-        
+
         if (statusKeys.some(sk => lowerKey.includes(sk))) {
           keyInfo.push('status information');
           dataType = 'status';
@@ -647,13 +695,13 @@ Respond naturally as if you're explaining this information to a colleague:`;
 
     // Remover duplicados
     const uniqueKeyInfo = [...new Set(keyInfo)];
-    
+
     const analysis = {
       type: dataType,
       keyInfo: uniqueKeyInfo.length > 0 ? uniqueKeyInfo : ['general data'],
       structure: structure
     };
-    
+
     // console.log("📊 Analysis complete:", analysis);
     return analysis;
   }
@@ -665,7 +713,7 @@ Respond naturally as if you're explaining this information to a colleague:`;
     console.log("\n🔄 Creating fallback response...");
     // console.log("📝 Query:", originalQuery);
     // console.log("📊 Function results:", functionResults);
-    
+
     const resultMatch = functionResults.match(/\[\[result: (.*?)\]\]/);
     if (!resultMatch) {
       console.log("❌ No result pattern in fallback");
@@ -677,13 +725,13 @@ Respond naturally as if you're explaining this information to a colleague:`;
     try {
       const data = JSON.parse(resultMatch[1]);
       console.log("✅ Parsed fallback data:", data);
-      
+
       // Análisis inteligente de los datos para crear respuesta de respaldo
       const analysis = this.analyzeFunctionData(data);
       console.log("🔍 Fallback analysis:", analysis);
-      
+
       let fallbackResponse;
-      
+
       if (analysis.type === 'status' && data.server) {
         fallbackResponse = `The ${data.server} server is currently ${data.status || 'operational'}. ${data.uptime?.formatted ? `It has been running for ${data.uptime.formatted}` : ''} ${data.memory?.used ? `and is using ${data.memory.used} of memory.` : ''}`;
       } else if (analysis.type === 'list' && Array.isArray(data)) {
@@ -694,10 +742,10 @@ Respond naturally as if you're explaining this information to a colleague:`;
         // Respuesta genérica basada en el análisis
         fallbackResponse = `Here's the information you requested (${analysis.structure}): ${JSON.stringify(data, null, 2)}`;
       }
-      
+
       console.log("🎯 Generated fallback response:", fallbackResponse);
       return fallbackResponse;
-      
+
     } catch (e) {
       console.log("⚠️ Failed to parse fallback data, using raw:", e.message);
       return resultMatch[1]; // Retornar datos raw

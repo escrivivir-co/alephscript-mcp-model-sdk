@@ -117,7 +117,7 @@ export const NODE_LLAMA_CPP_CONFIGS = {
 class MyCustomChatWrapper extends ChatWrapper {
   wrapperName = "MyCustomChat";
   userContext = "";
-
+  systemContext = "";
   settings = {
     ...ChatWrapper.defaultSettings,
     supportsSystemMessages: true,
@@ -140,7 +140,7 @@ class MyCustomChatWrapper extends ChatWrapper {
     availableFunctions,
     documentFunctionParams,
   }) {
-    console.log("Called generateContextState");
+    console.log("Called generateContextState. User Context size:", this.userContext.length, "System Context size:", this.systemContext.length);
 
     // Modificar el sistema base para ser más directo con las funciones
     const baseSystemMessage =
@@ -198,7 +198,7 @@ class MyCustomChatWrapper extends ChatWrapper {
     availableFunctions,
     { documentParams = true }
   ) {
-    console.log("Called generateAvailableFunctionsSystemText");
+    console.log("Called generateContextState. User Context size:", this.userContext.length, "System Context size:", this.systemContext.length);
     const functionsDocumentationGenerator =
       new ChatModelFunctionsDocumentationGenerator(availableFunctions);
 
@@ -242,6 +242,7 @@ class MyCustomChatWrapper extends ChatWrapper {
 /**
  * Clase para manejar el modelo local legacy
  */
+
 export class NodeLLamaCppHandler {
   constructor(config = {}) {
     this.llamaInstance = null;
@@ -263,18 +264,42 @@ export class NodeLLamaCppHandler {
       return;
     }
 
-    this.initFunctions();
-    
     if (!fs.existsSync(this.modelPath)) {
       throw new Error(`Model file not found at: ${this.modelPath}`);
     }
 
+    if (!this.llamaInstance) {
+      await this.initializeLlamaInstance();
+    }
+
+    if (!this.llamaInstance) {
+      throw new Error("Failed to initialize llama instance");
+    }
+
+    this.initFunctions();
+
+    // Mostrar estadísticas del modelo
+    if (this.model) {
+      console.log(`Context size: ${this.context.contextSize}`);
+      console.log(`Threads: ${this.context.threadCount || 'auto'}`);
+
+      // Verificar que el tokenizer esté disponible
+      try {
+        await this.model.tokenize("test");
+        console.log("✅ Tokenizer working correctly");
+      } catch (error) {
+        console.warn("⚠️ Tokenizer issue:", error.message);
+      }
+    }
+  }
+
+  async initializeLlamaInstance() {
     console.log("Initializing local model...");
     console.log(`GPU enabled: ${this.gpu}`);
     console.log(`GPU layers: ${this.gpuLayers || 'auto'}`);
     console.log(`VRAM padding: ${this.vramPadding}MB`);
-    
-    this.llamaInstance = await getLlama({ 
+
+    this.llamaInstance = await getLlama({
       gpu: this.gpu,
       vramPadding: this.vramPadding,
       // � DEFINITIVO: Prohibir compilación completamente
@@ -286,44 +311,47 @@ export class NodeLLamaCppHandler {
         log: (level, message) => console.log(`[Llama ${level}]`, message),
       }
     });
-    
-    this.model = await this.llamaInstance.loadModel({ 
+
+    this.model = await this.llamaInstance.loadModel({
       modelPath: this.modelPath,
       gpuLayers: this.gpuLayers, // undefined = automático, 0 = solo CPU, >0 = cantidad específica
     });
-    
+
+    if (!this.model) {
+      throw new Error("Failed to load model");
+    }
+
     this.context = await this.model.createContext({
       threads: this.gpu ? 1 : 4, // Menos hilos para GPU, más para CPU
       contextSize: 4096, // Aumentado para mejor contexto
     });
 
+    if (!this.context) {
+      throw new Error("Failed to create context");
+    }
+
     this.wrapper = new MyCustomChatWrapper();
 
+    // Create context sequence first
+    const contextSequence = this.context.getSequence();
+    console.log("🔍 Debug - Context sequence created:", !!contextSequence);
+
     this.session = new LlamaChatSession({
-      contextSequence: this.context.getSequence(),
+      contextSequence: contextSequence,
       chatWrapper: this.wrapper,
       autoDisposeSequence: false, // Evitar disposal automático
     });
 
+    if (!this.session) {
+      throw new Error("Failed to create chat session");
+    }
+
+    console.log("🔍 Debug - Session created successfully:", !!this.session);
+
     this.ready = true;
     console.log("Local model initialized successfully");
     console.log(`Model loaded with GPU: ${this.gpu ? 'YES' : 'NO'}`);
-    
-    // Mostrar estadísticas del modelo
-    if (this.model) {
-      console.log(`Context size: ${this.context.contextSize}`);
-      console.log(`Threads: ${this.context.threadCount || 'auto'}`);
-      
-      // Verificar que el tokenizer esté disponible
-      try {
-        await this.model.tokenize("test");
-        console.log("✅ Tokenizer working correctly");
-      } catch (error) {
-        console.warn("⚠️ Tokenizer issue:", error.message);
-      }
-    }
   }
-
   initFunctions() {
     // Registrar sets de funciones solicitados
     this.functionSets.forEach((setName) => {
@@ -333,12 +361,12 @@ export class NodeLLamaCppHandler {
         console.warn(`Local function set '${setName}' not found`);
       }
     });
-    console.log(
+    /* console.log(
       "ROUTE FOR node_llama_cpp_handler.mjs",
       "initialize",
       "Functions",
       this.functions
-    );
+    ); */
   }
 
   async chat(prompt, context, functions = null) {
@@ -346,10 +374,22 @@ export class NodeLLamaCppHandler {
       await this.initialize();
     }
 
-    // Verificar que la sesión esté disponible
+    // Verificar que todos los componentes estén disponibles
     if (!this.session) {
       throw new Error("Chat session not initialized");
     }
+    
+    if (!this.model) {
+      throw new Error("Model not initialized");
+    }
+    
+    if (!this.context) {
+      throw new Error("Context not initialized");
+    }
+
+    console.log("🔍 Debug - Model available:", !!this.model);
+    console.log("🔍 Debug - Context available:", !!this.context);
+    console.log("🔍 Debug - Session available:", !!this.session);
 
     this.wrapper.userContext = context || "";
 
@@ -357,7 +397,7 @@ export class NodeLLamaCppHandler {
     this.lastFunctionResults = [];
 
     const usingFunctions = functions || this.getFunctionsForNodeLlamaWithInterception();
-    
+
     console.log("\nFinal prompt", prompt, "Functions: ", Object.keys(usingFunctions));
     console.log("\n\n Going to local model");
 
@@ -371,13 +411,19 @@ export class NodeLLamaCppHandler {
         };
       }
 
+      // Try without functions first to see if basic chat works
+      console.log("🔍 Debug - Attempting basic chat without functions...");
+      const basicResult = await this.session.prompt("Hello");
+      console.log("🔍 Debug - Basic chat result:", basicResult);
+
       // Con funciones
+      console.log("🔍 Debug - Attempting chat with functions...");
       const result = await this.session.prompt(prompt, {
         functions: usingFunctions,
         maxTokens: 100, // Limitar para evitar timeouts
         temperature: 0.7,
       });
-      
+
       console.log("\n\nBack from local model", result);
       // console.log("Function results captured:", this.lastFunctionResults);
 
@@ -440,7 +486,7 @@ export class NodeLLamaCppHandler {
     const { name, params, result } = lastResult;
 
     console.log("Natural response for", name, params, result);
-    
+
     // Format the result based on the function type
     if (name === 'getFruitPrice' && result && typeof result === 'object') {
       return `The price of ${result.name} is ${result.price}.`;
@@ -453,7 +499,7 @@ export class NodeLLamaCppHandler {
     } else if (typeof result === 'object') {
       return JSON.stringify(result, null, 2);
     }
-    
+
     return String(result);
   }
 

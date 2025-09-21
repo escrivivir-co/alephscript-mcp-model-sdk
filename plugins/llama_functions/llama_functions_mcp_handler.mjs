@@ -154,10 +154,22 @@ export class LlamaFunctionMCPHandler extends LlamaFunctionHandler {
       await this.initialize();
     }
 
-    // Verificar que la sesión esté disponible
+    // Verificar que todos los componentes estén disponibles
     if (!this.session) {
       throw new Error("Chat session not initialized");
     }
+    
+    if (!this.model) {
+      throw new Error("Model not initialized");
+    }
+    
+    if (!this.context) {
+      throw new Error("Context not initialized");
+    }
+
+    console.log("🔍 Debug - Model available:", !!this.model);
+    console.log("🔍 Debug - Context available:", !!this.context);
+    console.log("🔍 Debug - Session available:", !!this.session);
 
     this.wrapper.userContext = systemContext;
 
@@ -230,7 +242,7 @@ export class LlamaFunctionMCPHandler extends LlamaFunctionHandler {
       ]);
 
       console.log("\n✅ Model inference completed!");
-      console.log("\nLocal model raw response:", answer);
+      console.log("\nLocal model raw response:", (answer || "").trim().substring(0, 300) + "...");
 
       // Buscar y procesar llamadas a funciones manualmente
       const processedAnswer = await this.processFunctionCalls(answer);
@@ -304,7 +316,7 @@ export class LlamaFunctionMCPHandler extends LlamaFunctionHandler {
    * Procesar llamadas a funciones con routing inteligente MCP vs Local
    */
   async processFunctionCalls(text) {
-    console.log("\n🔍 Looking for function calls in:", text);
+    console.log("\n🔍 Looking for function calls in:", text.trim().substring(0, 300) + "...");
 
     // Regex más flexible para capturar diferentes formatos
     const functionCallRegex = /(?:\[\[call:\s*|\b)(\w+)\s*\(\s*(\{[^}]*\}|\{\}|)\s*\)/g;

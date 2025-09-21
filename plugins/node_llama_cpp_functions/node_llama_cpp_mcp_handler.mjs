@@ -41,6 +41,8 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
           console.warn(`⚠️ Set de funciones desconocido: ${setName}`);
         }
       });
+      // Limpiar functionSets para evitar duplicación en super.initFunctions()
+      this.functionSets = [];
     }
   }
 

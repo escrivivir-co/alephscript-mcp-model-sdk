@@ -209,9 +209,10 @@ app.post('/ai', async (req, res) => {
           req.body.useFunctions === false ? 'none' :
             'none'); // Por defecto sin funciones para compatibilidad
 
+    const fallbackMode = 'node_llama_cpp_MCP_functions';
     if (functionMode === 'none') {
-      console.log("⚠️ AI Service: Modo de funciones no especificado activando llama_MCP_functions!");
-      functionMode = 'llama_MCP_functions';
+      console.log(`⚠️ AI Service: Modo de funciones no especificado activando ${fallbackMode}!`);
+      functionMode = fallbackMode;
     } else {
       console.log(`🔍 AI Service: Modo de funciones detectado: ${functionMode}`);
     }
@@ -230,7 +231,7 @@ app.post('/ai', async (req, res) => {
 
         console.log(`📨 AI Service: Procesando input con handler ${functionMode}: "${userInput}"`);
         const result = await handler.chat(userInput, userContext);
-        console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}`);
+        console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}, result.answer:`, result.answer);
 
         return res.json({
           answer: result.answer || result,
@@ -246,12 +247,13 @@ app.post('/ai', async (req, res) => {
     
     // Fallback: use shared handler or legacy mode
     console.log("AI Service: Processing request in fallback mode...");
+    const systemContext = req.body.prompt || '';
     const userContext = req.body.context || '';
 
     // Try to use shared handler first
     if (llamaInstance) {
       console.log("AI Service: Using shared model handler...");
-      const result = await llamaInstance.chat(userInput, userContext);
+      const result = await llamaInstance.chat(userInput, systemContext + '\n' + userContext);
       return res.json({
         answer: result.answer || result,
         snippets: userContext ? userContext.split('\n').slice(0, 50) : [],
@@ -287,7 +289,7 @@ app.post('/ai', async (req, res) => {
     });
   } catch (err) {
     lastError = err;
-    console.error("AI Service Error:", err.message);
+    console.error("AI Service Error:", err);
     res.status(500).json({ error: 'Internal Server Error', details: String(err.message || err) });
   }
 });
