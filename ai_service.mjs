@@ -201,13 +201,20 @@ app.post('/ai', async (req, res) => {
     const userInput = String(req.body.input || '').trim();
 
     // Detectar modo de funciones desde request o config
-    const functionMode = req.body.functionMode ||
+    let functionMode = req.body.functionMode ||
       (req.body.llama_MCP_functions ? 'llama_MCP_functions' :
         req.body.node_llama_cpp_MCP_functions ? 'node_llama_cpp_MCP_functions' :
         req.body.node_llama_cpp_functions ? 'node_llama_cpp_functions' :
         req.body.llama_functions ? 'llama_functions' :
           req.body.useFunctions === false ? 'none' :
             'none'); // Por defecto sin funciones para compatibilidad
+
+    if (functionMode === 'none') {
+      console.log("⚠️ AI Service: Modo de funciones no especificado activando llama_MCP_functions!");
+      functionMode = 'llama_MCP_functions';
+    } else {
+      console.log(`🔍 AI Service: Modo de funciones detectado: ${functionMode}`);
+    }
 
     // Si hay modo de funciones disponible, usar el plugin
     if (functionMode !== 'none' && functionsPlugin) {
@@ -236,6 +243,7 @@ app.post('/ai', async (req, res) => {
       }
     }
 
+    
     // Fallback: use shared handler or legacy mode
     console.log("AI Service: Processing request in fallback mode...");
     const userContext = req.body.context || '';
