@@ -40,8 +40,12 @@
     "verify-gpu": "npm run gpu:check && echo 'Running GPU verification...' && npm run gpu:test-simple",
     
     "help": "sh ./help.sh",
-    "info": "sh ./help.sh"
-        
+    "info": "sh ./help.sh",
+    "ai:start": "node /src/AI/ai_service_standalone.mjs",
+    "ai:health": "curl -s http://localhost:4001/health | jq .",
+    "ai:status": "curl -s http://localhost:4001/status | jq .",
+    "ai:test": "curl -s -X POST http://localhost:4001/ai -H 'Content-Type: application/json' -d '{\"input\":\"Hello AI, are you working?\"}' | jq .",
+    "ai:logs": "docker-compose logs -f oasis-server-dev | grep 'AI Service'"
 
 
 

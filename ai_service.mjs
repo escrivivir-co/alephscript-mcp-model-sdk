@@ -1,10 +1,10 @@
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import { getLlama, LlamaChatSession } from 'node-llama-cpp';
 
-// ✅ Configuración standalone - puerto independiente
 const PORT = process.env.PORT || 4001;
 
 // ✅ GPU Configuration from environment variables
@@ -12,8 +12,7 @@ const GPU_ENABLED = process.env.GPU_ENABLED === 'true' || process.env.GPU_ENABLE
 const GPU_LAYERS = process.env.GPU_LAYERS === 'auto' ? undefined : (process.env.GPU_LAYERS ? parseInt(process.env.GPU_LAYERS) : undefined);
 const VRAM_PADDING = process.env.VRAM_PADDING ? parseInt(process.env.VRAM_PADDING) : (GPU_ENABLED ? 256 : 64);
 
-console.log('🚀 AI Service Standalone Configuration:');
-console.log(`   Puerto: ${PORT}`);
+console.log('🚀 AI Service Configuration:');
 console.log(`   GPU Enabled: ${GPU_ENABLED ? 'YES' : 'NO'}`);
 console.log(`   GPU Layers: ${GPU_LAYERS || 'auto'}`);
 console.log(`   VRAM Padding: ${VRAM_PADDING}MB`);
@@ -27,19 +26,17 @@ try {
   const { getNodeLlamaCppHandler } = await import('./plugins/node_llama_cpp_functions/node_llama_cpp_handler.mjs');
   const { getNodeLlamaCppMCPHandler } = await import('./plugins/node_llama_cpp_functions/node_llama_cpp_mcp_handler.mjs');
   functionsPlugin = { getLLamaFunctionsHandler, getNodeLlamaCppHandler, getLLamaFunctionsMCPHandler, getNodeLlamaCppMCPHandler, LLAMA_FUNCTIONS_PRESETS };
-  console.log('✅ Functions plugin loaded successfully');
 } catch (error) {
-  console.log('⚠️ Functions plugin not available, running in basic mode');
+  console.log('Functions plugin not available, running in basic mode');
 }
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '10mb' })); // Aumentar límite para contexto grande
+app.use(express.json());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Variables del sistema AI
 let llamaInstance, model, context, session;
 let ready = false;
 let lastError = null;
@@ -50,69 +47,65 @@ let functionHandlerDev = null;
 let functionHandlerMcp = null; // Manual implementation (hybrid)
 let functionHandlerMcpNative = null; // Native node-llama-cpp implementation
 
-// ✅ Inicialización del modelo (modo legacy sin funciones)
 async function initModel() {
   if (ready) {
-    console.log("AI Service Standalone: Model already loaded, skipping initialization");
+    console.log("AI Service: Model already loaded, skipping initialization");
     return;
   }
 
-  const modelPath = path.join(__dirname, 'models', 'oasis-42-1-chat.Q4_K_M.gguf');
-  if (!fs.existsSync(modelPath)) {
-    throw new Error(`Model file not found at: ${modelPath}`);
-  }
-
-  console.log("AI Service Standalone: Loading model from:", modelPath);
-  console.log(`AI Service Standalone: GPU configuration - Enabled: ${GPU_ENABLED}, Layers: ${GPU_LAYERS || 'auto'}, VRAM Padding: ${VRAM_PADDING}MB`);
-
-  llamaInstance = await getLlama({
-    gpu: GPU_ENABLED,
-    vramPadding: VRAM_PADDING,
-    // � DEFINITIVO: PROHIBIR compilación completamente
-    build: "never",  // NUNCA compilar - solo usar binarios existentes
-    usePrebuiltBinaries: true,  // Usar binarios precompilados
-    skipDownload: false,  // Permitir descarga de binarios precompilados
-    progressLogs: false,  // Silenciar logs de compilación
-    // Logger para debug
-    logger: {
-      log: (level, message) => console.log(`[Llama ${level}]`, message),
+  // Fallback to legacy mode if no functions plugin
+  if (!functionsPlugin) {
+    const modelPath = path.join(__dirname, 'models', 'oasis-42-1-chat.Q4_K_M.gguf');
+    if (!fs.existsSync(modelPath)) {
+      throw new Error(`Model file not found at: ${modelPath}`);
     }
-  });
 
-  model = await llamaInstance.loadModel({
-    modelPath,
-    gpuLayers: GPU_LAYERS
-  });
+    console.log("AI Service: Loading model from:", modelPath);
+    console.log(`AI Service: GPU configuration - Enabled: ${GPU_ENABLED}, Layers: ${GPU_LAYERS || 'auto'}, VRAM Padding: ${VRAM_PADDING}MB`);
 
-  context = await model.createContext({
-    threads: GPU_ENABLED ? 1 : 4, // Menos hilos para GPU
-    contextSize: 4096,
-  });
+    llamaInstance = await getLlama({
+      gpu: GPU_ENABLED,
+      vramPadding: VRAM_PADDING,
+      logger: GPU_ENABLED ? {
+        log: (level, message) => console.log(`[Llama ${level}]`, message),
+      } : undefined
+    });
 
-  session = new LlamaChatSession({
-    contextSequence: context.getSequence(),
-    autoDisposeSequence: false
-  });
+    model = await llamaInstance.loadModel({
+      modelPath,
+      gpuLayers: GPU_LAYERS
+    });
 
-  console.log("AI Service Standalone: Model loaded and session initialized.");
+    context = await model.createContext({
+      threads: GPU_ENABLED ? 1 : 4, // Menos hilos para GPU
+      contextSize: 4096,
+    });
 
-  if (GPU_ENABLED) {
-    console.log("🎯 GPU acceleration enabled for AI standalone service!");
+    session = new LlamaChatSession({
+      contextSequence: context.getSequence(),
+      autoDisposeSequence: false
+    });
+
+    console.log("AI Service: Model loaded and session initialized.");
+
+    if (GPU_ENABLED) {
+      console.log("🎯 GPU acceleration enabled for AI service!");
+    }
+    ready = true;
   }
-  ready = true;
 }
 
-// ✅ Plugin initialization functions
+// Plugin initialization functions
 async function getFunctionHandler(mode) {
   if (!functionsPlugin) return null;
 
-  console.log(`🔧 AI Service Standalone: Solicitando handler para modo: ${mode}`);
+  console.log(`🔧 AI Service: Solicitando handler para modo: ${mode}`);
   const modelPath = path.join(__dirname, 'models', 'oasis-42-1-chat.Q4_K_M.gguf');
   
   switch (mode) {
     case 'node_llama_cpp_functions': {
       if (!functionHandlerProd) {
-        console.log("🔧 AI Service Standalone: Creando handler PROD (node_llama_cpp_handler.mjs)");
+        console.log("🔧 AI Service: Creando handler PROD (node_llama_cpp_handler.mjs)");
         functionHandlerProd = await functionsPlugin.getNodeLlamaCppHandler({
           modelPath,
           functionSets: ['fruits', 'system'],
@@ -120,32 +113,32 @@ async function getFunctionHandler(mode) {
           gpuLayers: GPU_LAYERS,
           vramPadding: VRAM_PADDING
         });
-        console.log("✅ AI Service Standalone: Handler PROD creado exitosamente");
+        console.log("✅ AI Service: Handler PROD creado exitosamente");
       } else {
-        console.log("♻️ AI Service Standalone: Reutilizando handler PROD existente");
+        console.log("♻️ AI Service: Reutilizando handler PROD existente");
       }
       return functionHandlerProd;
     }
     case 'llama_functions': {
       if (!functionHandlerDev) {
-        console.log("🔧 AI Service Standalone: Creando handler DEV (llama_functions_handler.mjs)");
+        console.log("🔧 AI Service: Creando handler DEV (llama_functions_handler.mjs)");
         functionHandlerDev = await functionsPlugin.getLLamaFunctionsHandler(modelPath, ['fruits', 'system'], {
           gpu: GPU_ENABLED,
           gpuLayers: GPU_LAYERS,
           vramPadding: VRAM_PADDING
         });
-        console.log("🔧 AI Service Standalone: Inicializando handler DEV...");
+        console.log("🔧 AI Service: Inicializando handler DEV...");
         await functionHandlerDev.initialize();
-        console.log("✅ AI Service Standalone: Handler DEV creado e inicializado exitosamente");
+        console.log("✅ AI Service: Handler DEV creado e inicializado exitosamente");
       } else {
-        console.log("♻️ AI Service Standalone: Reutilizando handler DEV existente");
+        console.log("♻️ AI Service: Reutilizando handler DEV existente");
       }
       return functionHandlerDev;
     }
     case 'llama_MCP_functions': {
       if (!functionHandlerMcp) {
-        console.log("🔧 AI Service Standalone: Creando handler MCP (llama_functions_mcp_handler.mjs)");
-        console.log("🔧 AI Service Standalone: Registrando servidor MCP localhost:3003...");
+        console.log("🔧 AI Service: Creando handler MCP (llama_functions_mcp_handler.mjs)");
+        console.log("🔧 AI Service: Registrando servidor MCP localhost:3003...");
         
         // ⚠️ CRÍTICO: getLLamaFunctionsMCPHandler YA inicializa el handler internamente
         // NO llamar initialize() después o se duplicará la inicialización
@@ -163,16 +156,16 @@ async function getFunctionHandler(mode) {
           gpuLayers: GPU_LAYERS,
           vramPadding: VRAM_PADDING
         });
-        console.log("✅ AI Service Standalone: Handler MCP creado e inicializado exitosamente");
+        console.log("✅ AI Service: Handler MCP creado e inicializado exitosamente");
       } else {
-        console.log("♻️ AI Service Standalone: Reutilizando handler MCP existente");
+        console.log("♻️ AI Service: Reutilizando handler MCP existente");
       }
       return functionHandlerMcp;
     }
     case 'node_llama_cpp_MCP_functions': {
       if (!functionHandlerMcpNative) {
-        console.log("🔧 AI Service Standalone: Creando handler MCP Native (node_llama_cpp_mcp_handler.mjs)");
-        console.log("🔧 AI Service Standalone: Usando node-llama-cpp nativo para funciones MCP...");
+        console.log("🔧 AI Service: Creando handler MCP Native (node_llama_cpp_mcp_handler.mjs)");
+        console.log("🔧 AI Service: Usando node-llama-cpp nativo para funciones MCP...");
         
         functionHandlerMcpNative = await functionsPlugin.getNodeLlamaCppMCPHandler({
           modelPath,
@@ -188,36 +181,26 @@ async function getFunctionHandler(mode) {
           gpuLayers: GPU_LAYERS,
           vramPadding: VRAM_PADDING
         });
-        console.log("✅ AI Service Standalone: Handler MCP Native creado e inicializado exitosamente");
+        console.log("✅ AI Service: Handler MCP Native creado e inicializado exitosamente");
       } else {
-        console.log("♻️ AI Service Standalone: Reutilizando handler MCP Native existente");
+        console.log("♻️ AI Service: Reutilizando handler MCP Native existente");
       }
       return functionHandlerMcpNative;
     }
     default : {
-      console.log(`❌ AI Service Standalone: Modo '${mode}' no reconocido`);
+      console.log(`❌ AI Service: Modo '${mode}' no reconocido`);
     }
   }
 
   return null;
 }
 
-// ✅ ENDPOINT PRINCIPAL /ai - Standalone version
 app.post('/ai', async (req, res) => {
-  console.log("AI Service Standalone: Received /ai request", {
-    hasInput: !!req.body.input,
-    hasContext: !!req.body.context,
-    functionMode: req.body.functionMode || 'none'
-  });
-  
+  console.log("Call /ai", req.body)
   try {
     const userInput = String(req.body.input || '').trim();
-    
-    if (!userInput) {
-      return res.status(400).json({ error: 'No input provided' });
-    }
 
-    // Detectar modo de funciones desde request
+    // Detectar modo de funciones desde request o config
     const functionMode = req.body.functionMode ||
       (req.body.llama_MCP_functions ? 'llama_MCP_functions' :
         req.body.node_llama_cpp_MCP_functions ? 'node_llama_cpp_MCP_functions' :
@@ -226,21 +209,21 @@ app.post('/ai', async (req, res) => {
           req.body.useFunctions === false ? 'none' :
             'none'); // Por defecto sin funciones para compatibilidad
 
-    // ✅ El contexto ya viene procesado desde backend.js
-    const userContext = req.body.context || '';
-    const userPrompt = req.body.prompt || 'Provide an informative and precise response.';
-
-    console.log(`📊 AI Service Standalone: Procesando en modo '${functionMode}'`);
-    console.log(`📊 Contexto recibido: ${userContext.length} caracteres`);
-
     // Si hay modo de funciones disponible, usar el plugin
     if (functionMode !== 'none' && functionsPlugin) {
-      console.log(`🚀 AI Service Standalone: Iniciando modo '${functionMode}'!`);
+      console.log(`🚀 AI Service: Iniciando modo '${functionMode}'!`);
       const handler = await getFunctionHandler(functionMode);
       if (handler) {
-        console.log(`📨 AI Service Standalone: Procesando input con handler ${functionMode}: "${userInput}"`);
+        let userContext = '';
+        try {
+          userContext = req.body.context || '';
+        } catch (err) {
+          console.log("⚠️ AI Service: Error extrayendo contexto:", err.message)
+        }
+
+        console.log(`📨 AI Service: Procesando input con handler ${functionMode}: "${userInput}"`);
         const result = await handler.chat(userInput, userContext);
-        console.log(`✅ AI Service Standalone: Respuesta generada con handler ${functionMode}`);
+        console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}`);
 
         return res.json({
           answer: result.answer || result,
@@ -249,13 +232,30 @@ app.post('/ai', async (req, res) => {
           mode: functionMode
         });
       } else {
-        console.log(`❌ AI Service Standalone: No se pudo obtener handler para modo '${functionMode}', fallback a legacy`);
+        console.log(`❌ AI Service: No se pudo obtener handler para modo '${functionMode}'`);
       }
     }
 
-    // ✅ Fallback: modo legacy con session
-    console.log("AI Service Standalone: Processing request in legacy mode...");
+    // Fallback: use shared handler or legacy mode
+    console.log("AI Service: Processing request in fallback mode...");
+    const userContext = req.body.context || '';
+
+    // Try to use shared handler first
+    if (llamaInstance) {
+      console.log("AI Service: Using shared model handler...");
+      const result = await llamaInstance.chat(userInput, userContext);
+      return res.json({
+        answer: result.answer || result,
+        snippets: userContext ? userContext.split('\n').slice(0, 50) : [],
+        hadFunctionCalls: result.hadFunctionCalls || false,
+        mode: 'shared'
+      });
+    }
+
+    // Ultimate fallback: legacy mode with session
     await initModel();
+    console.log("AI Service: Using legacy session mode...");
+    const userPrompt = req.body.prompt || 'Provide an informative and precise response.';
 
     let snippets = [];
     if (userContext) {
@@ -269,10 +269,9 @@ app.post('/ai', async (req, res) => {
       userPrompt
     ].filter(Boolean).join('\n\n');
 
-    console.log("AI Service Standalone: Generating answer...");
+    console.log("AI Service: Generating answer...");
     const answer = await session.prompt(prompt);
-    console.log("AI Service Standalone: Answer generated successfully");
-    
+    console.log("AI Service: Answer generated successfully");
     res.json({
       answer: String(answer || '').trim(),
       snippets,
@@ -280,69 +279,50 @@ app.post('/ai', async (req, res) => {
     });
   } catch (err) {
     lastError = err;
-    console.error("AI Service Standalone Error:", err.message);
-    res.status(500).json({ 
-      error: 'Internal Server Error', 
-      details: String(err.message || err) 
-    });
+    console.error("AI Service Error:", err.message);
+    res.status(500).json({ error: 'Internal Server Error', details: String(err.message || err) });
   }
 });
 
-// ✅ ENDPOINT /health - Verificación de estado
+app.post('/ai/train', async (req, res) => {
+  res.json({ stored: true });
+});
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     ready: ready,
-    service: 'standalone',
-    port: PORT,
     error: lastError?.message || null,
     timestamp: Date.now()
   });
 });
 
-// ✅ ENDPOINT /status - Estado detallado
 app.get('/status', (req, res) => {
   res.json({
     status: ready ? 'ready' : 'initializing',
-    service: 'standalone',
-    port: PORT,
     modelLoaded: !!model,
     sessionReady: !!session,
-    gpu: GPU_ENABLED,
-    functionsAvailable: !!functionsPlugin,
     uptime: process.uptime(),
     memory: process.memoryUsage()
   });
 });
 
-// ✅ ENDPOINT /preload - Precarga del modelo
 app.post('/preload', async (req, res) => {
   try {
-    console.log("AI Service Standalone: Preloading model...");
+    console.log("AI Service: Preloading model...");
     await initModel();
     res.json({
       status: 'success',
       ready: ready,
-      service: 'standalone',
       message: 'Model preloaded successfully'
     });
   } catch (err) {
-    console.error("AI Service Standalone: Error preloading model:", err.message);
+    console.error("AI Service: Error preloading model:", err.message);
     res.status(500).json({
       status: 'error',
-      service: 'standalone',
       message: err.message
     });
   }
-});
-
-// ✅ ENDPOINT /shutdown - Apagado controlado (opcional para desarrollo)
-app.post('/shutdown', (req, res) => {
-  console.log('AI Service Standalone: Shutdown requested');
-  res.json({ status: 'shutting down' });
-  setTimeout(() => {
-    process.exit(0);
-  }, 1000);
 });
 
 console.log(`🤖 Servicio AI Standalone iniciado en puerto ${PORT}`);
@@ -351,13 +331,21 @@ console.log('  POST /ai - Procesar consulta AI');
 console.log('  GET /health - Estado del servicio');
 console.log('  GET /status - Estado detallado');
 console.log('  POST /preload - Precargar modelo');
-console.log('  POST /shutdown - Apagar servicio');
 
-// ✅ Manejo de errores de inicio
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 AI Service Standalone listening on port ${PORT}`);
+/* NO ACTIVAR EN PRODUCCIÓN, MUCHOS USUARIOS NO LO USARAN EN TODA LA SESION
+// Precargar el modelo al inicio
+console.log('🚀 Iniciando precarga del modelo...');
+initModel().then(() => {
+  console.log('✅ Modelo precargado exitosamente');
+}).catch((err) => {
+  console.error('❌ Error precargando modelo:', err.message);
+});
+*/
+
+app.listen(PORT, () => {
+  console.log(`🚀 AI Service starting on port ${PORT}`);
   console.log('📍 Available modes:');
-  console.log('  • Default: POST /ai {"input": "question", "context": "..."}');
+  console.log('  • Default: POST /ai {"input": "question"}');
   console.log('  • Functions MCP Manual: POST /ai {"input": "question", "llama_MCP_functions": true}');
   console.log('  • Functions MCP Native: POST /ai {"input": "question", "node_llama_cpp_MCP_functions": true}');
   console.log('  • Functions Prod: POST /ai {"input": "question", "node_llama_cpp_functions": true}');
@@ -367,20 +355,9 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('⚠️  Functions plugin not loaded - only legacy mode available');
   }
 }).on('error', (err) => {
-  console.error('❌ Failed to start AI Service Standalone:', err.message);
+  console.error('❌ Failed to start AI Service:', err.message);
   if (err.code === 'EADDRINUSE') {
     console.error(`Port ${PORT} is already in use`);
   }
   process.exit(1);
-});
-
-// ✅ Manejo de señales para apagado limpio
-process.on('SIGINT', () => {
-  console.log('AI Service Standalone: Received SIGINT, shutting down gracefully...');
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  console.log('AI Service Standalone: Received SIGTERM, shutting down gracefully...');
-  process.exit(0);
 });
