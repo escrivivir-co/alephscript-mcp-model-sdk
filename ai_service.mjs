@@ -7,10 +7,9 @@ import { getLlama, LlamaChatSession } from 'node-llama-cpp';
 
 const PORT = process.env.PORT || 4001;
 
-// ✅ GPU Configuration from environment variables
 const GPU_ENABLED = process.env.GPU_ENABLED === 'true' || process.env.GPU_ENABLED === '1';
 const GPU_LAYERS = process.env.GPU_LAYERS === 'auto' ? undefined : (process.env.GPU_LAYERS ? parseInt(process.env.GPU_LAYERS) : undefined);
-const VRAM_PADDING = process.env.VRAM_PADDING ? parseInt(process.env.VRAM_PADDING) : (GPU_ENABLED ? 256 : 64);
+const VRAM_PADDING = process.env.VRAM_PADDING ? parseInt(process.env.VRAM_PADDING) : (GPU_ENABLED ? 128 : 64);
 
 console.log('🚀 AI Service Configuration:');
 console.log(`   GPU Enabled: ${GPU_ENABLED ? 'YES' : 'NO'}`);

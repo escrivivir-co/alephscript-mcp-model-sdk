@@ -437,7 +437,7 @@ export class NodeLLamaCppHandler {
       }
 
       return {
-        answer: result || "No response generated",
+        answer: typeof result === "object" ? JSON.stringify(result, null, 2) || "No response generated" : String(result),
         hadFunctionCalls: Object.keys(usingFunctions).length > 0,
       };
     } catch (error) {

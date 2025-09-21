@@ -117,7 +117,7 @@ export class LlamaFunctionHandler {
     this.modelPath = config.modelPath;
     this.gpu = config.gpu !== false; // Por defecto habilitada
     this.gpuLayers = config.gpuLayers; // undefined = automático
-    this.vramPadding = config.vramPadding || 256; // 256MB de padding para GPU grande la mitad para normales --> es la cantidad de megas que no usará y así evitará colapsar la gpu
+    this.vramPadding = config.vramPadding || 128; // 128MB 
 
     this.model = null;
     this.context = null;
@@ -183,17 +183,22 @@ export class LlamaFunctionHandler {
       build: "never",  // NUNCA compilar - solo usar binarios existentes
       usePrebuiltBinaries: true,  // Usar binarios precompilados
       skipDownload: false,  // Permitir descarga de binarios precompilados
-      progressLogs: false,  // Silenciar logs de compilación
+      progressLogs: true,  // Habilitar logs para diagnosticar GPU
       logger: {
-        log: (level, message) =>
-          console.log(`[node-llama-cpp ${level}]`, message),
+        log: (level, message) => {
+          console.log(`[node-llama-cpp ${level}]`, message);
+          // Log específico para detección de GPU
+          if (message.includes('GPU') || message.includes('CUDA') || message.includes('VRAM')) {
+            console.log(`🎯 GPU INFO: ${message}`);
+          }
+        },
       },
     });
 
     console.log("Loading model from:", this.modelPath);
     this.model = await this.llamaInstance.loadModel({
       modelPath: this.modelPath,
-      gpuLayers: this.gpuLayers, // undefined = automático, 0 = solo CPU
+      gpuLayers: this.gpuLayers || 35, 
     });
 
     if (!this.model) {
@@ -202,8 +207,9 @@ export class LlamaFunctionHandler {
 
     console.log("Creating context...");
     this.context = await this.model.createContext({
-      threads: this.gpu ? 1 : 4, // Menos hilos para GPU, más para CPU
-      contextSize: 4096, // Aumentado para mejor contexto
+      threads: 1, // Menos hilos para GPU potente
+      contextSize: 2048, // Contexto más pequeño inicialmente para diagnóstico
+      batchSize: 512, 
     });
 
     if (!this.context) {
