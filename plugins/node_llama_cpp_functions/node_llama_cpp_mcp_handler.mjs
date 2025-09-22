@@ -1,24 +1,5 @@
 import { NodeLLamaCppHandler, NODE_LLAMA_CPP_CONFIGS } from './node_llama_cpp_handler.mjs';
-import { MCPMixin } from '../mcp/MCPMixin.mjs';
-
-
-export function mixMCPMixin(target) {
-  // Aplicar MCPMixin correctamente
-  const mcpMixin = new MCPMixin();
-
-  // Copiar todas las propiedades del mixin
-  Object.assign(target, mcpMixin);
-
-  // Copiar todos los métodos del prototype del mixin
-  const mcpProto = Object.getPrototypeOf(mcpMixin);
-  Object.getOwnPropertyNames(mcpProto).forEach(name => {
-    if (name !== 'constructor' && typeof mcpProto[name] === 'function') {
-      target[name] = mcpProto[name].bind(target);
-    }
-  });
-
-
-}
+import { mixMCPMixin } from '../mcp/mixer.mjs';
 
 export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
   constructor(config = {}) {
@@ -28,7 +9,7 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
 
   }
 
-  async intialize() {
+  async initialize() {
 
     await super.initialize();    
     this._addMCPFunctions();

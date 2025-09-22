@@ -30,6 +30,15 @@ try {
   console.log('Functions plugin not available, running in basic mode');
 }
 
+// MCP UI Routes import
+let mcpUIRoutes = null;
+try {
+  const { mcpUIRoutes: mcpRoutes } = await import('./plugins/mcp/mcp_ui_routes.mjs');
+  mcpUIRoutes = mcpRoutes;
+} catch (error) {
+  console.log('MCP UI Routes not available');
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -296,12 +305,23 @@ app.post('/preload', async (req, res) => {
   }
 });
 
+// Registrar rutas MCP UI si están disponibles
+if (mcpUIRoutes) {
+  mcpUIRoutes.registerRoutes(app);
+}
+
 console.log(`🤖 Servicio AI Standalone iniciado en puerto ${PORT}`);
 console.log('📋 Endpoints disponibles:');
 console.log('  POST /ai - Procesar consulta AI');
 console.log('  GET /health - Estado del servicio');
 console.log('  GET /status - Estado detallado');
 console.log('  POST /preload - Precargar modelo');
+if (mcpUIRoutes) {
+  console.log('  GET /ai/ui/mcp/list - Catálogo MCP UI');
+  console.log('  POST /ai/ui/mcp/set - Configurar preset MCP');
+  console.log('  GET /ai/ui/mcp/presets - Listar presets MCP');
+  console.log('  GET /ai/ui/mcp/preset/:name - Obtener preset MCP');
+}
 
 /* NO ACTIVAR EN PRODUCCIÓN, MUCHOS USUARIOS NO LO USARAN EN TODA LA SESION
 // Precargar el modelo al inicio
