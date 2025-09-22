@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import { getLlama, LlamaChatSession } from 'node-llama-cpp';
-import apiBridge from './api_bridge';
+import apiBridge from './api_bridge.mjs';
 
 const PORT = process.env.PORT || 4001;
 

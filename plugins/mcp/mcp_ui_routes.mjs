@@ -1,4 +1,6 @@
 import { getMCPFunctionHandler } from './mcp_function_handler.mjs';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * Manejo de rutas UI para MCP - Gestor de servidores, tools, resources y prompts
@@ -8,6 +10,8 @@ export class MCPUIRoutes {
   constructor() {
     this.mcpHandler = getMCPFunctionHandler();
     this.presets = new Map(); // Almacenamiento temporal de presets seleccionados
+    this.initialized = false;
+    this.knownServers = new Map(); // name -> { url, transport }
   }
 
   /**
@@ -16,6 +20,9 @@ export class MCPUIRoutes {
   async listMCPCatalog(req, res) {
     try {
       console.log('🔍 MCPUIRoutes: Solicitando catálogo MCP...');
+
+      // Asegurar servidores cargados (lazy init)
+      await this.ensureServersLoaded();
 
       const catalog = await this.buildMCPCatalog();
       
@@ -37,6 +44,64 @@ export class MCPUIRoutes {
         details: error.message,
         timestamp: new Date().toISOString()
       });
+    }
+  }
+
+  /**
+   * Cargar servidores MCP desde configuración si aún no hay ninguno
+   */
+  async ensureServersLoaded() {
+    try {
+      // Si ya hay servidores conectados, no hacer nada
+      if (this.mcpHandler.extractors && this.mcpHandler.extractors.size > 0) {
+        this.initialized = true;
+        return;
+      }
+
+      if (this.initialized) return;
+
+      // Intentar cargar desde archivo de configuración
+      const configPath = path.resolve(process.cwd(), 'AS_MCP_MESH_SDK', 'mcp.json');
+      if (!fs.existsSync(configPath)) {
+        console.warn(`⚠️ MCPUIRoutes: Archivo de configuración no encontrado: ${configPath}`);
+        return;
+      }
+
+      const raw = fs.readFileSync(configPath, 'utf-8');
+      let cfg;
+      try {
+        cfg = JSON.parse(raw);
+      } catch (e) {
+        console.error('❌ MCPUIRoutes: Error parseando mcp.json:', e.message);
+        return;
+      }
+
+      const servers = cfg.servers || {};
+      const entries = Object.entries(servers);
+      if (entries.length === 0) {
+        console.warn('⚠️ MCPUIRoutes: No hay servidores definidos en mcp.json');
+        return;
+      }
+
+      console.log(`🔧 MCPUIRoutes: Registrando ${entries.length} servidores MCP desde mcp.json...`);
+
+      const registrations = entries.map(async ([name, conf]) => {
+        const transport = conf.type || conf.transport || 'http';
+        const serverConfig = conf.url || conf; // permitir url directo o objeto
+        try {
+          return await this.mcpHandler.registerServer(name, serverConfig, transport);
+        } catch (err) {
+          console.error(`❌ MCPUIRoutes: Error registrando servidor ${name}:`, err.message);
+          return null;
+        }
+      });
+
+      const results = await Promise.all(registrations);
+      const ok = results.filter(Boolean).length;
+      console.log(`✅ MCPUIRoutes: Servidores registrados: ${ok}/${entries.length}`);
+      this.initialized = true;
+    } catch (error) {
+      console.error('❌ MCPUIRoutes: Error en ensureServersLoaded:', error);
     }
   }
 
@@ -209,6 +274,21 @@ export class MCPUIRoutes {
         }
       }
 
+      // Incluir servidores conocidos que no lograron conectar
+      for (const [name, conf] of this.knownServers) {
+        if (!Array.from(extractors.keys()).includes(name)) {
+          catalog.push({
+            serverName: name,
+            serverInfo: { name, url: conf.url },
+            isConnected: false,
+            error: 'not connected',
+            tools: [],
+            resources: [],
+            prompts: []
+          });
+        }
+      }
+
       return catalog;
 
     } catch (error) {
@@ -333,6 +413,9 @@ export class MCPUIRoutes {
     console.log('  POST /ai/ui/mcp/set - Configurar preset MCP');
     console.log('  GET /ai/ui/mcp/presets - Listar presets');
     console.log('  GET /ai/ui/mcp/preset/:name - Obtener preset específico');
+
+    // Disparar carga en segundo plano sin bloquear el arranque
+    this.ensureServersLoaded().catch(() => {});
   }
 }
 
