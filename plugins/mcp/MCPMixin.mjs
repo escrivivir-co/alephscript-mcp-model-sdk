@@ -289,4 +289,30 @@ export class MCPMixin {
     // Esto puede ser sobrescrito por las clases hijas si manejan cache
     this.functionToServerMap.clear();
   }
+
+  /**
+   * Construye un Set de funciones permitidas a partir de un preset MCP.
+   * @param {object} mcpPreset - El objeto preset.
+   * @returns {Set<string>} Un Set con los shortFunctionNames permitidos.
+   */
+  _buildAllowedFunctionsSet(mcpPreset) {
+    const allowedFunctions = new Set();
+    if (!mcpPreset || !mcpPreset.selectedItems) {
+      return allowedFunctions;
+    }
+
+    const toolItems = mcpPreset.selectedItems.filter(item => item.type === 'tool');
+
+    for (const item of toolItems) {
+      // Encontrar el shortFunctionName correspondiente
+      for (const [shortName, mapping] of this.functionToServerMap.entries()) {
+        if (mapping.originalServerName === item.serverName && mapping.toolName === item.name) {
+          allowedFunctions.add(shortName);
+          break; // Pasar al siguiente item del preset
+        }
+      }
+    }
+
+    return allowedFunctions;
+  }
 }

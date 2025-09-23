@@ -7,6 +7,7 @@
 
   "scripts": {
 
+    "start": "npm run start:gpu",
     "start:gpu": "start_gpu.bat",
     "start:gpu-safe": "start_gpu_safe.bat",
     "start:cpu": "start_cpu.bat",

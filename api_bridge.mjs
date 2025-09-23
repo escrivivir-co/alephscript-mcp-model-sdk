@@ -1,4 +1,11 @@
 
+let mcpUIRoutes = null;
+try {
+    mcpUIRoutes = (await import('./plugins/mcp/mcp_ui_routes.mjs')).default;
+} catch (e) {
+    console.log('MCP UI routes module not found, preset features will be disabled.');
+}
+
 
 export default async function apiBridge(req, res) {
 
@@ -29,11 +36,37 @@ export default async function apiBridge(req, res) {
 
     promptData.mode = functionMode;
 
+    // --- MCP Preset Handling ---
+    const usePresetEnv = process.env.USE_PRESET === 'true';
+    const scanFullMcpServerEnv = process.env.SCAN_FULL_MCP_SERVER === 'true';
+
+    let usePreset = false;
+    if (usePresetEnv) {
+        usePreset = true;
+    } else if (scanFullMcpServerEnv) {
+        usePreset = false;
+    }
+
+    const presetNameAlias = req.body.mcpPresetName || req.body.presetName || req.body.preset || req.body.mcpPreset;
+    const mcpPresetName = presetNameAlias || process.env.PRESET_DEFAULT_NAME || null;
+    let mcpPreset = null;
+
+    if (mcpPresetName && mcpUIRoutes) {
+        mcpPreset = mcpUIRoutes.getPreset(mcpPresetName);
+        if (mcpPreset) {
+            console.log(`✅ AI Service: Using MCP preset '${mcpPresetName}'.`);
+        } else {
+            console.log(`⚠️ AI Service: MCP preset '${mcpPresetName}' not found.`);
+        }
+    }
+    // --- End MCP Preset Handling ---
+
     // Si hay modo de funciones disponible, usar el plugin
     if (functionMode !== 'none' && functionsPlugin) {
         console.log(`🚀 AI Service: Iniciando modo '${functionMode}'!`);
         const handler = await getFunctionHandler(functionMode);
         if (handler) {
+            const userInput = promptData.input;
             let userContext = '';
             try {
                 userContext = req.body.context || '';
@@ -41,8 +74,14 @@ export default async function apiBridge(req, res) {
                 console.log("⚠️ AI Service: Error extrayendo contexto:", err.message)
             }
 
+            const options = {
+                mcpPresetName,
+                mcpPreset,
+                usePreset
+            };
+
             console.log(`📨 AI Service: Procesando input con handler ${functionMode}: "${userInput}"`);
-            const result = await handler.chat(userInput, userContext);
+            const result = await handler.chat(userInput, userContext, options);
             console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}, result.answer:`, result.answer);
             console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}`, "--------------------------");
 
@@ -50,7 +89,10 @@ export default async function apiBridge(req, res) {
                 answer: result.answer || result,
                 snippets: userContext ? userContext.split('\n').slice(0, 50) : [],
                 hadFunctionCalls: result.hadFunctionCalls || false,
-                mode: functionMode
+                mode: functionMode,
+                mcpPresetName: usePreset ? mcpPresetName : null,
+                mcpPresetCounts: usePreset && mcpPreset ? mcpPreset.itemsCount : undefined,
+                usePreset: usePreset
             }
 
             promptData.payload = promptPayload;

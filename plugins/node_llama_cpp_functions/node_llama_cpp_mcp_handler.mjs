@@ -4,10 +4,20 @@ import { mixMCPMixin } from '../mcp/mixer.mjs';
 export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
   constructor(config = {}) {
     super(config);
-
-    mixMCPMixin(this); // ???
-
+    mixMCPMixin(this);
+    this.activeMCPPreset = null;
+    this.activeUsePreset = false;
   }
+
+  async chat(userInput, systemContext = "", options = {}) {
+    // Store preset and flag for this chat instance
+    this.activeMCPPreset = options.mcpPreset || null;
+    this.activeUsePreset = options.usePreset || false;
+
+    // The actual chat logic is in the base class, which will use the filtered functions
+    return super.chat(userInput, systemContext, options);
+  }
+
 
   async initialize() {
 
@@ -19,9 +29,20 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
   _addMCPFunctions() {
     const mcpFunctionMap = this._buildMCPFunctionMapping();
 
+    // --- Preset Filtering ---
+    let functionsToRegister = Object.entries(mcpFunctionMap);
+    if (this.activeUsePreset && this.activeMCPPreset) {
+        const allowedShortNames = this._buildAllowedFunctionsSet(this.activeMCPPreset);
+        console.log(`🔧 Filtering NodeLLamaCppMCP functions with preset. Allowed: ${allowedShortNames.size}`);
+        functionsToRegister = functionsToRegister.filter(([shortFunctionName, _]) =>
+            allowedShortNames.has(shortFunctionName)
+        );
+    }
+    // --- End Preset Filtering ---
+
     // For SLMs that needs listing the functions on prompts
     // all functions are prefixed with short server name
-    for (const [shortFunctionName, functionDef] of Object.entries(mcpFunctionMap)) {
+    for (const [shortFunctionName, functionDef] of functionsToRegister) {
       const serverInfo = this.functionToServerMap.get(shortFunctionName);
 
       // Registrar función con interceptación MCP
@@ -32,7 +53,7 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
       });
     }
 
-    console.log(`🔧 NodeLLamaCppMCPHandler: Added MCP functions`);
+    console.log(`🔧 NodeLLamaCppMCPHandler: Added ${functionsToRegister.length} MCP functions`);
   }
 
  registerMCPFunction(name, config) {
@@ -40,6 +61,16 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
 
     const mcpHandler = async (params) => {
       console.log(`🔄 NodeLLamaCppMCPHandler: execute ${name} -> ${serverInfo.toolName} at ${serverInfo.serverName}`);
+
+      // --- Preset Enforcement ---
+      if (this.activeUsePreset) {
+          const allowedShortNames = this._buildAllowedFunctionsSet(this.activeMCPPreset);
+          if (!allowedShortNames.has(name)) {
+              console.warn(`🚫 MCP function call blocked by preset: ${name}`);
+              return JSON.stringify({ error: "Function not allowed by active preset" });
+          }
+      }
+      // --- End Preset Enforcement ---
 
       try {
         // Mixing method

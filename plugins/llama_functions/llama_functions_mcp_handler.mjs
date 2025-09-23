@@ -149,10 +149,14 @@ export class LlamaFunctionMCPHandler extends LlamaFunctionHandler {
   /**
    * Chat con funciones híbridas (locales + MCP) - con prompt optimizado
    */
-  async chat(userInput, systemContext = "") {
+  async chat(userInput, systemContext = "", options = {}) {
     if (!this.ready) {
       await this.initialize();
     }
+
+    // Store preset and flag for this chat instance
+    this.activeMCPPreset = options.mcpPreset || null;
+    this.activeUsePreset = options.usePreset || false;
 
     // Verificar que todos los componentes estén disponibles
     if (!this.session) {
@@ -173,8 +177,19 @@ export class LlamaFunctionMCPHandler extends LlamaFunctionHandler {
 
     this.wrapper.userContext = systemContext;
 
+    // --- Preset Filtering ---
+    let availableFunctions = this.getRegisteredFunctions();
+    if (this.activeUsePreset && this.activeMCPPreset) {
+        const allowedShortNames = this._buildAllowedFunctionsSet(this.activeMCPPreset);
+        console.log(`🔧 Filtering functions with preset. Allowed: ${allowedShortNames.size}`);
+        availableFunctions = availableFunctions.filter(f => {
+            // Permitir todas las funciones locales y solo las MCP permitidas
+            return !this.isMCPFunction(f.name) || allowedShortNames.has(f.name);
+        });
+    }
+    // --- End Preset Filtering ---
+
     // Generar ejemplos dinámicos basados en las funciones disponibles
-    const availableFunctions = this.getRegisteredFunctions();
     const dynamicExamples = this._generateDynamicExamples(availableFunctions, userInput);
 
     const prompt = [
@@ -330,6 +345,20 @@ export class LlamaFunctionMCPHandler extends LlamaFunctionHandler {
       console.log(
         `Found function call: ${functionName} with params: ${paramsStr}`
       );
+
+      // --- Preset Enforcement ---
+      if (this.activeUsePreset && this.isMCPFunction(functionName)) {
+          const allowedShortNames = this._buildAllowedFunctionsSet(this.activeMCPPreset);
+          if (!allowedShortNames.has(functionName)) {
+              console.warn(`🚫 MCP function call blocked by preset: ${functionName}`);
+              processedText = processedText.replace(
+                  fullMatch,
+                  `[[result: "Function not allowed by active preset"]]`
+              );
+              continue; // Skip to the next match
+          }
+      }
+      // --- End Preset Enforcement ---
 
       // Verificar que es una función válida registrada
       if (!this.isMCPFunction(functionName) && !this.functions.has(functionName)) {
