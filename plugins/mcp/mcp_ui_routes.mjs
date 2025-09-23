@@ -408,11 +408,7 @@ export class MCPUIRoutes {
     app.get('/ai/ui/mcp/presets', this.listMCPPresets.bind(this));
     app.get('/ai/ui/mcp/preset/:name', this.getMCPPreset.bind(this));
 
-    console.log('📋 MCPUIRoutes: Rutas MCP UI registradas:');
-    console.log('  GET /ai/ui/mcp/list - Catálogo de servidores MCP');
-    console.log('  POST /ai/ui/mcp/set - Configurar preset MCP');
-    console.log('  GET /ai/ui/mcp/presets - Listar presets');
-    console.log('  GET /ai/ui/mcp/preset/:name - Obtener preset específico');
+    console.log('📋 MCPUIRoutes: UI routes registered (list/set/presets/preset/:name)');
 
     // Disparar carga en segundo plano sin bloquear el arranque
     this.ensureServersLoaded().catch(() => {});

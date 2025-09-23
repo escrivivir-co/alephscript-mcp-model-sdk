@@ -310,19 +310,6 @@ if (mcpUIRoutes) {
   mcpUIRoutes.registerRoutes(app);
 }
 
-console.log(`🤖 Servicio AI Standalone iniciado en puerto ${PORT}`);
-console.log('📋 Endpoints disponibles:');
-console.log('  POST /ai - Procesar consulta AI');
-console.log('  GET /health - Estado del servicio');
-console.log('  GET /status - Estado detallado');
-console.log('  POST /preload - Precargar modelo');
-if (mcpUIRoutes) {
-  console.log('  GET /ai/ui/mcp/list - Catálogo MCP UI');
-  console.log('  POST /ai/ui/mcp/set - Configurar preset MCP');
-  console.log('  GET /ai/ui/mcp/presets - Listar presets MCP');
-  console.log('  GET /ai/ui/mcp/preset/:name - Obtener preset MCP');
-}
-
 /* NO ACTIVAR EN PRODUCCIÓN, MUCHOS USUARIOS NO LO USARAN EN TODA LA SESION
 // Precargar el modelo al inicio
 console.log('🚀 Iniciando precarga del modelo...');
@@ -335,15 +322,49 @@ initModel().then(() => {
 
 app.listen(PORT, () => {
   console.log(`🚀 AI Service starting on port ${PORT}`);
-  console.log('📍 Available modes:');
+
+  console.log('\n📋 Core Endpoints:');
+  console.log('  • POST /ai: Process AI query');
+  console.log('  • GET /health: Service health check');
+  console.log('  • GET /status: Detailed service status');
+  console.log('  • POST /preload: Preload model');
+
+  if (mcpUIRoutes) {
+    console.log('\n🔧 MCP UI Endpoints:');
+    console.log('  • GET /ai/ui/mcp/list: List MCP servers and capabilities');
+    console.log('  • POST /ai/ui/mcp/set: Create/update a preset');
+    console.log('  • GET /ai/ui/mcp/presets: List all saved presets');
+    console.log('  • GET /ai/ui/mcp/preset/:name: Get specific preset');
+  }
+
+  console.log('\n⚙️ Preset Configuration:');
+  const usePreset = process.env.USE_PRESET === 'true';
+  const scanFull = process.env.SCAN_FULL_MCP_SERVER === 'true';
+  const defaultPreset = process.env.PRESET_DEFAULT_NAME;
+
+  if (usePreset) {
+    console.log('  • Preset Mode: ENABLED (USE_PRESET=true)');
+  } else if (scanFull) {
+    console.log('  • Preset Mode: DISABLED (SCAN_FULL_MCP_SERVER=true)');
+  } else {
+    console.log('  • Preset Mode: DISABLED (default)');
+  }
+  if (defaultPreset) {
+    console.log(`  • Default Preset: "${defaultPreset}" (PRESET_DEFAULT_NAME)`);
+  } else {
+    console.log('  • Default Preset: Not set');
+  }
+
+  console.log('\n📍 Available Modes & Usage:');
   console.log('  • Default: POST /ai {"input": "question"}');
   console.log('  • Functions MCP Manual: POST /ai {"input": "question", "llama_MCP_functions": true}');
   console.log('  • Functions MCP Native: POST /ai {"input": "question", "node_llama_cpp_MCP_functions": true}');
   console.log('  • Functions Prod: POST /ai {"input": "question", "node_llama_cpp_functions": true}');
   console.log('  • Functions Dev: POST /ai {"input": "question", "llama_functions": true}');
+  console.log('  • With Preset: POST /ai {"input": "question", "presetName": "my-preset"}');
   console.log('  • No Functions: POST /ai {"input": "question", "useFunctions": false}');
   if (!functionsPlugin) {
-    console.log('⚠️  Functions plugin not loaded - only legacy mode available');
+    console.log('\n⚠️  Functions plugin not loaded - only legacy mode available');
   }
 }).on('error', (err) => {
   console.error('❌ Failed to start AI Service:', err.message);
