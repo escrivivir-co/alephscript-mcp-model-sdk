@@ -292,7 +292,7 @@ Searched text for `mcpServers\s*:` (`**/*.{mjs,js,json}`), 8 results
 
 Read [](file:///c%3A/Users/oracl/Documents/REPOS/mcp-model-sdk/plugins/mcp/mcp_function_handler.mjs#100-100), lines 100 to 203
 
-Read [](file:///c%3A/Users/oracl/Documents/REPOS/mcp-model-sdk/AS_MCP_MESH_SDK/mcp.json)
+Read [](file:///c%3A/Users/oracl/Documents/REPOS/mcp-model-sdk/PRESETS/mcp.json)
 
 I'll update the MCP UI routes to auto-load MCP servers from mcp.json on first use, so /ai/ui/mcp/list returns populated data without needing prior /ai calls.
 
@@ -306,7 +306,7 @@ Read [](file:///c%3A/Users/oracl/Documents/REPOS/mcp-model-sdk/package.json)
 
 Read [](file:///c%3A/Users/oracl/Documents/REPOS/mcp-model-sdk/plugins/mcp/mcp_tools_extractor.mjs#50-50), lines 50 to 140
 
-Read [](file:///c%3A/Users/oracl/Documents/REPOS/mcp-model-sdk/AS_MCP_MESH_SDK/mcp_functions.json#1-1), lines 1 to 400
+Read [](file:///c%3A/Users/oracl/Documents/REPOS/mcp-model-sdk/PRESETS/mcp_functions.json#1-1), lines 1 to 400
 
 Using "Apply Patch"
 

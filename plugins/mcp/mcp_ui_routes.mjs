@@ -12,6 +12,14 @@ export class MCPUIRoutes {
     this.presets = new Map(); // Almacenamiento temporal de presets seleccionados
     this.initialized = false;
     this.knownServers = new Map(); // name -> { url, transport }
+    this.presetsFilePath = path.resolve(process.cwd(), 'PRESETS', 'mcp_presets.json');
+
+    // Cargar presets desde disco si existen
+    try {
+      this.loadPresetsFromDisk();
+    } catch (e) {
+      console.warn('⚠️ MCPUIRoutes: No se pudieron cargar presets desde disco:', e.message);
+    }
   }
 
   /**
@@ -61,7 +69,7 @@ export class MCPUIRoutes {
       if (this.initialized) return;
 
       // Intentar cargar desde archivo de configuración
-      const configPath = path.resolve(process.cwd(), 'AS_MCP_MESH_SDK', 'mcp.json');
+      const configPath = path.resolve(process.cwd(), 'PRESETS', 'mcp_servers.json');
       if (!fs.existsSync(configPath)) {
         console.warn(`⚠️ MCPUIRoutes: Archivo de configuración no encontrado: ${configPath}`);
         return;
@@ -72,18 +80,18 @@ export class MCPUIRoutes {
       try {
         cfg = JSON.parse(raw);
       } catch (e) {
-        console.error('❌ MCPUIRoutes: Error parseando mcp.json:', e.message);
+        console.error('❌ MCPUIRoutes: Error parseando mcp_servers.json:', e.message);
         return;
       }
 
       const servers = cfg.servers || {};
       const entries = Object.entries(servers);
       if (entries.length === 0) {
-        console.warn('⚠️ MCPUIRoutes: No hay servidores definidos en mcp.json');
+        console.warn('⚠️ MCPUIRoutes: No hay servidores definidos en mcp_servers.json');
         return;
       }
 
-      console.log(`🔧 MCPUIRoutes: Registrando ${entries.length} servidores MCP desde mcp.json...`);
+      console.log(`🔧 MCPUIRoutes: Registrando ${entries.length} servidores MCP desde mcp_servers.json...`);
 
       const registrations = entries.map(async ([name, conf]) => {
         const transport = conf.type || conf.transport || 'http';
@@ -142,6 +150,13 @@ export class MCPUIRoutes {
       };
 
       this.presets.set(presetName, preset);
+
+      // Guardar en disco
+      try {
+        this.savePresetsToDisk();
+      } catch (persistErr) {
+        console.warn('⚠️ MCPUIRoutes: Error guardando preset en disco:', persistErr.message);
+      }
 
       console.log(`✅ MCPUIRoutes: Preset '${presetName}' configurado con ${preset.itemsCount.total} elementos`);
 
@@ -396,6 +411,65 @@ export class MCPUIRoutes {
    */
   hasPreset(presetName) {
     return this.presets.has(presetName);
+  }
+
+  /**
+   * Persistencia: cargar presets desde fichero JSON
+   */
+  loadPresetsFromDisk() {
+    try {
+      if (!fs.existsSync(this.presetsFilePath)) {
+        return; // Nada que cargar
+      }
+      const raw = fs.readFileSync(this.presetsFilePath, 'utf-8');
+      if (!raw.trim()) return;
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch (e) {
+        console.error('❌ MCPUIRoutes: Error parseando mcp_presets.json:', e.message);
+        return;
+      }
+
+      const arr = Array.isArray(data) ? data : (Array.isArray(data?.presets) ? data.presets : []);
+      let loaded = 0;
+      for (const p of arr) {
+        if (p && p.name && Array.isArray(p.items)) {
+          const preset = {
+            name: p.name,
+            items: p.items,
+            createdAt: p.createdAt || new Date().toISOString(),
+            itemsCount: p.itemsCount || this.countPresetItems(p.items)
+          };
+          this.presets.set(preset.name, preset);
+          loaded++;
+        }
+      }
+      if (loaded > 0) {
+        console.log(`💾 MCPUIRoutes: ${loaded} preset(s) cargados desde disco`);
+      }
+    } catch (error) {
+      console.error('❌ MCPUIRoutes: Error leyendo presets desde disco:', error.message);
+    }
+  }
+
+  /**
+   * Persistencia: guardar presets a fichero JSON
+   */
+  savePresetsToDisk() {
+    try {
+      const dir = path.dirname(this.presetsFilePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const presets = Array.from(this.presets.values());
+      const payload = { version: 1, presets };
+      fs.writeFileSync(this.presetsFilePath, JSON.stringify(payload, null, 2), 'utf-8');
+      console.log(`💾 MCPUIRoutes: Presets guardados en ${this.presetsFilePath}`);
+    } catch (error) {
+      console.error('❌ MCPUIRoutes: Error guardando presets en disco:', error.message);
+      throw error;
+    }
   }
 
   /**

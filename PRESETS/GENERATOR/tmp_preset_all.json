@@ -1,0 +1,155 @@
+{
+  "presetName": "PRESET_DEFAUL_ALL",
+  "selectedItems": [
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "list_prompts"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "add_prompt"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "edit_prompt"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "delete_prompt"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "get_prompt"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "list_resources"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "add_resource"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "edit_resource"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "delete_resource"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "get_resource"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "start_system"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "open_web_console"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "get_server_status"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "get_server_info"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "set_user_personality"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "simulate_user_decision"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "simulate_agent_selection"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "control_simulator_mode"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "get_simulator_status"
+    },
+    {
+      "serverName": "localhost",
+      "type": "tool",
+      "name": "analyze_game_context"
+    },
+    {
+      "serverName": "localhost",
+      "type": "resource",
+      "name": "Estado del Proyecto"
+    },
+    {
+      "serverName": "localhost",
+      "type": "resource",
+      "name": "Scripts NPM Disponibles"
+    },
+    {
+      "serverName": "localhost",
+      "type": "resource",
+      "name": "Estado del Juego en Tiempo Real"
+    },
+    {
+      "serverName": "localhost",
+      "type": "resource",
+      "name": "Estadísticas del Runtime"
+    },
+    {
+      "serverName": "localhost",
+      "type": "resource",
+      "name": "Estado de Servidores MCP"
+    },
+    {
+      "serverName": "localhost",
+      "type": "resource",
+      "name": "Estado de los Agentes"
+    },
+    {
+      "serverName": "localhost",
+      "type": "resource",
+      "name": "UserSimulator Status"
+    },
+    {
+      "serverName": "localhost",
+      "type": "prompt",
+      "name": "start-system"
+    },
+    {
+      "serverName": "localhost",
+      "type": "prompt",
+      "name": "open-web-console"
+    },
+    {
+      "serverName": "localhost",
+      "type": "prompt",
+      "name": "simulator-control"
+    }
+  ]
+}

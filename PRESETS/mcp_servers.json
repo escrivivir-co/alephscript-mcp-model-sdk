@@ -1,0 +1,9 @@
+{
+    "servers": [
+        {
+            "name": "devops-mcp",
+            "url": "http://localhost:3003",
+            "transport": "http"
+        }
+    ]
+}
