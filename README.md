@@ -1,3 +1,5 @@
+KEY NAME / NOMBRE CLAVE: ./SLMo42.md
+
 (NOTE PROJECT CONTEXT: https://github.com/escrivivir-co/oasis-features-lab-no-official)
 # Oasis AI Service - GPU Optimized
 
