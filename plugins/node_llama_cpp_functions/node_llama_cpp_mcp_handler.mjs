@@ -7,12 +7,16 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
     mixMCPMixin(this);
     this.activeMCPPreset = null;
     this.activeUsePreset = false;
+    this.lastPresetKey = null; // Cache para evitar re-registros innecesarios
   }
 
   async chat(userInput, systemContext = "", options = {}) {
     // Store preset and flag for this chat instance
     this.activeMCPPreset = options.mcpPreset || null;
     this.activeUsePreset = options.usePreset || false;
+
+    // NO re-registrar funciones aquí - dejar que el filtrado suceda en runtime
+    console.log(`� Chat with preset: ${this.activeUsePreset ? this.activeMCPPreset?.name || 'default' : 'none'}`);
 
     // The actual chat logic is in the base class, which will use the filtered functions
     return super.chat(userInput, systemContext, options);
@@ -29,16 +33,9 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
   _addMCPFunctions() {
     const mcpFunctionMap = this._buildMCPFunctionMapping();
 
-    // --- Preset Filtering ---
-    let functionsToRegister = Object.entries(mcpFunctionMap);
-    if (this.activeUsePreset && this.activeMCPPreset) {
-        const allowedShortNames = this._buildAllowedFunctionsSet(this.activeMCPPreset);
-        console.log(`🔧 Filtering NodeLLamaCppMCP functions with preset. Allowed: ${allowedShortNames.size}`);
-        functionsToRegister = functionsToRegister.filter(([shortFunctionName, _]) =>
-            allowedShortNames.has(shortFunctionName)
-        );
-    }
-    // --- End Preset Filtering ---
+    // Registrar TODAS las funciones MCP - el filtrado de preset se hace en runtime
+    const functionsToRegister = Object.entries(mcpFunctionMap);
+    console.log(`🔧 Registering all ${functionsToRegister.length} MCP functions (preset filtering happens at runtime)`);
 
     // For SLMs that needs listing the functions on prompts
     // all functions are prefixed with short server name
@@ -54,6 +51,32 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
     }
 
     console.log(`🔧 NodeLLamaCppMCPHandler: Added ${functionsToRegister.length} MCP functions`);
+    
+    // Validate that all registered functions have valid handlers
+    this._validateHandlers();
+  }
+
+  /**
+   * Validate that all registered functions have callable handlers
+   */
+  _validateHandlers() {
+    let validCount = 0;
+    let invalidCount = 0;
+    
+    for (const [name, functionDef] of this.functions) {
+      if (typeof functionDef.handler === 'function') {
+        validCount++;
+      } else {
+        invalidCount++;
+        console.error(`❌ Invalid handler for function '${name}':`, typeof functionDef.handler);
+      }
+    }
+    
+    console.log(`✅ Handler validation: ${validCount} valid, ${invalidCount} invalid`);
+    
+    if (invalidCount > 0) {
+      throw new Error(`Found ${invalidCount} functions with invalid handlers`);
+    }
   }
 
  registerMCPFunction(name, config) {
@@ -62,8 +85,8 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
     const mcpHandler = async (params) => {
       console.log(`🔄 NodeLLamaCppMCPHandler: execute ${name} -> ${serverInfo.toolName} at ${serverInfo.serverName}`);
 
-      // --- Preset Enforcement ---
-      if (this.activeUsePreset) {
+      // --- Preset Enforcement (aplicado dinámicamente) ---
+      if (this.activeUsePreset && this.activeMCPPreset) {
           const allowedShortNames = this._buildAllowedFunctionsSet(this.activeMCPPreset);
           if (!allowedShortNames.has(name)) {
               console.warn(`🚫 MCP function call blocked by preset: ${name}`);
@@ -92,6 +115,56 @@ export class NodeLLamaCppMCPHandler extends NodeLLamaCppHandler {
 
     this.functions.set(name, nodeLlamaFunction);
     // console.log(`🔧 NodeLLamaCppMCPHandler: registered: ${name}`);
+  }
+
+  /**
+   * Override para incluir funciones MCP con interceptación
+   */
+  getFunctionsForNodeLlamaWithInterception() {
+    const functionsObj = {};
+    
+    // Obtener funciones base (locales) con interceptación
+    const baseFunctions = super.getFunctionsForNodeLlamaWithInterception();
+    Object.assign(functionsObj, baseFunctions);
+    
+    // Añadir funciones MCP con la misma interceptación
+    this.functions.forEach((func, name) => {
+      // Solo procesar funciones MCP (tienen underscore en el nombre)
+      if (name.includes('_') && this.functionToServerMap && this.functionToServerMap.has(name)) {
+        functionsObj[name] = {
+          ...func,
+          handler: async (params) => {
+            console.log(`🔧 MCP Function called: ${name}`, params);
+            
+            // Aplicar filtro de preset dinámicamente
+            if (this.activeUsePreset && this.activeMCPPreset) {
+              const allowedShortNames = this._buildAllowedFunctionsSet(this.activeMCPPreset);
+              if (!allowedShortNames.has(name)) {
+                console.warn(`🚫 MCP function call blocked by preset: ${name}`);
+                const result = { error: "Function not allowed by active preset" };
+                this.lastFunctionResults.push({ name, params, result });
+                return result;
+              }
+            }
+            
+            const result = await func.handler(params);
+            
+            // Añadir a lastFunctionResults para interceptación
+            this.lastFunctionResults.push({
+              name,
+              params,
+              result,
+            });
+            
+            return result;
+          },
+        };
+      }
+    });
+    
+    console.log(`🔧 Prepared ${Object.keys(functionsObj).length} functions for node-llama-cpp (${Object.keys(baseFunctions).length} local + ${Object.keys(functionsObj).length - Object.keys(baseFunctions).length} MCP)`);
+    
+    return functionsObj;
   }
 
   /**

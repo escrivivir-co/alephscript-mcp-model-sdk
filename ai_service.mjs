@@ -209,10 +209,10 @@ app.post('/ai', async (req, res) => {
   try {
     const userInput = String(req.body.input || '').trim();
 
-    const promptData = await apiBridge(req, res);
+    const promptData = await apiBridge(req, res, functionsPlugin, getFunctionHandler);
 
     if (promptData.mode == 'node' || promptData.payload) {
-      return res.json(promptData);
+      return res.json(promptData.payload);
     }
 
     // Fallback: use shared handler or legacy mode

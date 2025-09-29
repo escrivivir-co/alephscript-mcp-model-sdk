@@ -1,4 +1,4 @@
-  {
+{
   "version": 1,
   "presets": [
     {
@@ -161,6 +161,33 @@
         "resources": 7,
         "prompts": 3,
         "total": 30
+      }
+    },
+    {
+      "name": "SPRINT_611_TEST_PRESET",
+      "items": [
+        {
+          "serverName": "localhost",
+          "type": "tool",
+          "name": "list_prompts"
+        },
+        {
+          "serverName": "localhost",
+          "type": "tool",
+          "name": "edit_prompt"
+        },
+        {
+          "serverName": "localhost",
+          "type": "tool",
+          "name": "delete_prompt"
+        }
+      ],
+      "createdAt": "2025-09-29T14:50:38.651Z",
+      "itemsCount": {
+        "tools": 3,
+        "resources": 0,
+        "prompts": 0,
+        "total": 3
       }
     }
   ]

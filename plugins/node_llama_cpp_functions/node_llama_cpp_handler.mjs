@@ -382,7 +382,24 @@ export class NodeLLamaCppHandler {
 
     this.lastFunctionResults = [];
 
-    const usingFunctions = functions || this.getFunctionsForNodeLlamaWithInterception();
+    // Allow third argument to be either a functions map or an options-like object.
+    // If an options object (e.g., { mcpPresetName, mcpPreset, usePreset }) is passed here by callers,
+    // do NOT treat it as the functions map; instead, ignore and use default registered functions.
+    let usingFunctions;
+    const isOptionsLike = (
+      functions && typeof functions === 'object' && !Array.isArray(functions) && (
+        Object.prototype.hasOwnProperty.call(functions, 'usePreset') ||
+        Object.prototype.hasOwnProperty.call(functions, 'mcpPreset') ||
+        Object.prototype.hasOwnProperty.call(functions, 'mcpPresetName')
+      )
+    );
+
+    if (isOptionsLike) {
+      console.log('⚠️  Detected options object passed as third argument to chat(); ignoring as functions map.');
+      usingFunctions = this.getFunctionsForNodeLlamaWithInterception();
+    } else {
+      usingFunctions = functions || this.getFunctionsForNodeLlamaWithInterception();
+    }
 
     console.log("\nFinal prompt", prompt, "Functions: ", Object.keys(usingFunctions));
     console.log("\n\n Going to local model");

@@ -7,7 +7,7 @@ try {
 }
 
 
-export default async function apiBridge(req, res) {
+export default async function apiBridge(req, res, functionsPlugin, getFunctionHandler) {
 
     const promptData = {
         input: String(req.body.input || '').trim(),
@@ -80,8 +80,8 @@ export default async function apiBridge(req, res) {
                 usePreset
             };
 
-            console.log(`📨 AI Service: Procesando input con handler ${functionMode}: "${userInput}"`);
-            const result = await handler.chat(userInput, userContext, options);
+            console.log(`📨 AI Service: Procesando input con handler ${functionMode}: "${promptData.input}"`);
+            const result = await handler.chat(promptData.input, userContext, options);
             console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}, result.answer:`, result.answer);
             console.log(`✅ AI Service: Respuesta generada con handler ${functionMode}`, "--------------------------");
 
