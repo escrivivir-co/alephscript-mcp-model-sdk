@@ -75,7 +75,11 @@ export default async function apiBridge(req, res, functionsPlugin, getFunctionHa
     const scanFullMcpServerEnv = process.env.SCAN_FULL_MCP_SERVER === 'true';
 
     let usePreset = false;
-    if (usePresetEnv) {
+    if (req.body.usePresetTools === true) {
+        // Priority: explicit request from Zeus
+        usePreset = true;
+        console.log('🎯 AI Service: Using preset tools as requested by Zeus');
+    } else if (usePresetEnv) {
         usePreset = true;
     } else if (scanFullMcpServerEnv) {
         usePreset = false;

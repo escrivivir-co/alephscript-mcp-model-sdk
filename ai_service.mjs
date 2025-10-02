@@ -47,7 +47,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let llamaInstance, model, context, session;
-let ready = false;
+let ready = true;
 let lastError = null;
 
 // Plugin handlers - inicializados cuando se necesiten

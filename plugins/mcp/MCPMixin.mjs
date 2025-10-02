@@ -295,12 +295,39 @@ export class MCPMixin {
    * @param {object} mcpPreset - El objeto preset.
    * @returns {Set<string>} Un Set con los shortFunctionNames permitidos.
    */
+  /**
+   * Construye un Set de funciones permitidas a partir de un preset MCP.
+   * Soporta ambos formatos: SLMo42 (selectedItems) y Zeus (items).
+   * @param {object} mcpPreset - El objeto preset.
+   * @returns {Set<string>} Un Set con los shortFunctionNames permitidos.
+   */
   _buildAllowedFunctionsSet(mcpPreset) {
     const allowedFunctions = new Set();
-    if (!mcpPreset || !mcpPreset.selectedItems) {
+    if (!mcpPreset) {
       return allowedFunctions;
     }
 
+    // Formato Zeus: { items: ["function_name1", "function_name2"] }
+    if (mcpPreset.items && Array.isArray(mcpPreset.items)) {
+      console.log("í´§ MCPMixin: Using Zeus preset format (items array)");
+      for (const functionName of mcpPreset.items) {
+        // Para Zeus, buscar directamente por nombre de funciÃ³n en el mapping
+        for (const [shortName, mapping] of this.functionToServerMap.entries()) {
+          if (mapping.toolName === functionName || shortName === functionName) {
+            allowedFunctions.add(shortName);
+            break;
+          }
+        }
+      }
+      return allowedFunctions;
+    }
+
+    // Formato SLMo42: { selectedItems: [{serverName, type, name}] }
+    if (!mcpPreset.selectedItems) {
+      return allowedFunctions;
+    }
+
+    console.log("í´§ MCPMixin: Using SLMo42 preset format (selectedItems array)");
     const toolItems = mcpPreset.selectedItems.filter(item => item.type === 'tool');
 
     for (const item of toolItems) {
