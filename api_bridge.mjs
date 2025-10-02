@@ -6,6 +6,38 @@ try {
     console.log('MCP UI routes module not found, preset features will be disabled.');
 }
 
+function prompInjectionFilter(promptData) {
+    const injectionPatterns = [
+        /<script.*?>.*?<\/script>/gi, // Scripts HTML       
+        /<.*?on\w+.*?=.*?>/gi, // Atributos on* en HTML
+        /javascript:\s*[^'"]+/gi, // URLs javascript:
+        /(\b)(alert|prompt|confirm|eval|exec|fetch|XMLHttpRequest|setTimeout|setInterval)(\s*\()/gi, // Funciones peligrosas
+        /-->/g, // Cierre de comentarios HTML
+        /<\s*\/?\s*script\s*>/gi, // Etiquetas de script,
+        /(\b)(system|assistant|function_call)(\b)/gi// System Prompt Injection, Assistant Prompt Injection, Function Call Injection
+    ];
+
+    for (const pattern of injectionPatterns) {
+        if (pattern.test(promptData.input)) {
+            console.warn(`⚠️ AI Service: Detected potential injection in user input: ${pattern}`);
+            promptData.input = promptData.input.replace(pattern, '[injection]');
+        }
+    }
+
+    for (const pattern of injectionPatterns) {
+        if (pattern.test(promptData.prompt)) {
+            console.warn(`⚠️ AI Service: Detected potential injection in user prompt: ${pattern}`);
+            promptData.prompt = promptData.prompt.replace(pattern, '[injection]');
+        }
+    }
+
+    for (const pattern of injectionPatterns) {
+        if (pattern.test(promptData.context)) {
+            console.warn(`⚠️ AI Service: Detected potential injection in user context: ${pattern}`);
+            promptData.context = promptData.context.replace(pattern, '[injection]');
+        }
+    }
+}
 
 export default async function apiBridge(req, res, functionsPlugin, getFunctionHandler) {
 
@@ -16,6 +48,8 @@ export default async function apiBridge(req, res, functionsPlugin, getFunctionHa
         mode: "none",
         payload: null
     }
+
+    prompInjectionFilter(promptData);
 
     // Detectar modo de funciones desde request o config
     let functionMode = req.body.functionMode ||
