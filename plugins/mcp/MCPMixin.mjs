@@ -302,21 +302,25 @@ export class MCPMixin {
    * @returns {Set<string>} Un Set con los shortFunctionNames permitidos.
    */
   _buildAllowedFunctionsSet(mcpPreset) {
+    console.log("🔍 DEBUG: _buildAllowedFunctionsSet called with preset:", JSON.stringify(mcpPreset, null, 2));
     const allowedFunctions = new Set();
     if (!mcpPreset) {
+      console.log("🔍 DEBUG: No preset provided, returning empty set");
       return allowedFunctions;
     }
 
-    // Formato Zeus: { items: ["function_name1", "function_name2"] }
+    // Formato Zeus: { items: [{serverName, type, name}] }
     if (mcpPreset.items && Array.isArray(mcpPreset.items)) {
-      console.log("��� MCPMixin: Using Zeus preset format (items array)");
-      for (const functionName of mcpPreset.items) {
-        // Para Zeus, buscar directamente por nombre de función en el mapping
-        for (const [shortName, mapping] of this.functionToServerMap.entries()) {
-          if (mapping.toolName === functionName || shortName === functionName) {
-            allowedFunctions.add(shortName);
-            break;
-          }
+      console.log("🧩 MCPMixin: Using Zeus preset format (items array)");
+      const toolItems = mcpPreset.items.filter(item => item.type === 'tool');
+
+      for (const item of toolItems) {
+        if (item.serverName && item.name) {
+          // Generar directamente el nombre correcto usando la lógica existente
+          const shortPrefix = this._generateShortPrefix(item.serverName);
+          const shortFunctionName = `${shortPrefix}_${item.name}`;
+          allowedFunctions.add(shortFunctionName);
+          console.log(`🔧 MCPMixin: Zeus mapped ${item.serverName}.${item.name} → ${shortFunctionName}`);
         }
       }
       return allowedFunctions;

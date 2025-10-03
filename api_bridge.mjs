@@ -1,8 +1,10 @@
 
 let mcpUIRoutes = null;
 try {
-    mcpUIRoutes = (await import('./plugins/mcp/mcp_ui_routes.mjs')).default;
+    mcpUIRoutes = (await import('./plugins/mcp/mcp_ui_routes.mjs')).mcpUIRoutes;
+    console.log('✅ DEBUG: mcpUIRoutes imported successfully');
 } catch (e) {
+    console.log('❌ DEBUG: MCP UI routes module import failed:', e.message);
     console.log('MCP UI routes module not found, preset features will be disabled.');
 }
 
@@ -89,6 +91,9 @@ export default async function apiBridge(req, res, functionsPlugin, getFunctionHa
     const mcpPresetName = presetNameAlias || process.env.PRESET_DEFAULT_NAME || null;
     let mcpPreset = null;
 
+    console.log(`🔍 DEBUG api_bridge: presetNameAlias = ${presetNameAlias}, mcpPresetName = ${mcpPresetName}`);
+    console.log(`🔍 DEBUG api_bridge: mcpUIRoutes available = ${!!mcpUIRoutes}`);
+
     if (mcpPresetName && mcpUIRoutes) {
         mcpPreset = mcpUIRoutes.getPreset(mcpPresetName);
         if (mcpPreset) {
@@ -96,6 +101,8 @@ export default async function apiBridge(req, res, functionsPlugin, getFunctionHa
         } else {
             console.log(`⚠️ AI Service: MCP preset '${mcpPresetName}' not found.`);
         }
+    } else if (mcpPresetName && !mcpUIRoutes) {
+        console.log(`❌ DEBUG: mcpUIRoutes not available but preset requested: ${mcpPresetName}`);
     }
     // --- End MCP Preset Handling ---
 

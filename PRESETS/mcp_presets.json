@@ -277,6 +277,28 @@
         "prompts": 0,
         "total": 2
       }
+    },
+    {
+      "name": "Function-Call-Debug-Test",
+      "items": [
+        {
+          "serverName": "devops-mcp-server",
+          "type": "tool",
+          "name": "get_server_status"
+        },
+        {
+          "serverName": "devops-mcp-server",
+          "type": "tool",
+          "name": "get_server_info"
+        }
+      ],
+      "createdAt": "2025-10-03T00:35:44.314Z",
+      "itemsCount": {
+        "tools": 2,
+        "resources": 0,
+        "prompts": 0,
+        "total": 2
+      }
     }
   ]
 }

@@ -5,6 +5,7 @@
   "main": "ai_service_standalone.mjs",
   "type": "module",
   "scripts": {
+    "ia": "npm start > slmo42_output.log 2>&1 &",
     "start": "npm run start:gpu",
     "start:gpu": "start_gpu.bat",
     "start:gpu-safe": "start_gpu_safe.bat",

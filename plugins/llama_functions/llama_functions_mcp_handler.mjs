@@ -23,6 +23,33 @@ export class LlamaFunctionMCPHandler extends LlamaFunctionHandler {
     });
     
     this.functionsCache = null; // Cache para evitar recalcular funciones
+    // ADD: Preset handling properties
+    this.activeMCPPreset = null;
+    this.activeUsePreset = false;
+  }
+
+  /**
+   * Chat con funciones híbridas (locales + MCP) - con preset support
+   */
+  async chat(userInput, systemContext = "", options = {}) {
+    if (!this.ready) {
+      await this.initialize();
+    }
+
+    // Store preset and flag for this chat instance
+    this.activeMCPPreset = options.mcpPreset || null;
+    this.activeUsePreset = options.usePreset || false;
+
+    console.log(`🎯 LlamaFunctionMCPHandler: Chat with preset: ${this.activeUsePreset ? this.activeMCPPreset?.name || 'default' : 'none'}`);
+    
+    if (this.activeUsePreset && this.activeMCPPreset) {
+      console.log(`🔧 LlamaFunctionMCPHandler: Applying preset filtering for: ${this.activeMCPPreset.name}`);
+      const allowedFunctions = this._buildAllowedFunctionsSet(this.activeMCPPreset);
+      console.log(`🔧 LlamaFunctionMCPHandler: Allowed functions: ${Array.from(allowedFunctions).join(', ')}`);
+    }
+
+    // Call parent chat method
+    return super.chat(userInput, systemContext, options);
   }
 
   /**
@@ -179,13 +206,20 @@ export class LlamaFunctionMCPHandler extends LlamaFunctionHandler {
 
     // --- Preset Filtering ---
     let availableFunctions = this.getRegisteredFunctions();
+    console.log(`🔧 LlamaFunctionsMCP: activeMCPPreset = ${!!this.activeMCPPreset}, activeUsePreset = ${this.activeUsePreset}`);
     if (this.activeUsePreset && this.activeMCPPreset) {
+        console.log(`🔧 LlamaFunctionsMCP: Applying preset filtering for preset: ${this.activeMCPPreset.name || 'unnamed'}`);
         const allowedShortNames = this._buildAllowedFunctionsSet(this.activeMCPPreset);
-        console.log(`🔧 Filtering functions with preset. Allowed: ${allowedShortNames.size}`);
+        console.log(`🔧 Filtering functions with preset. Allowed: ${allowedShortNames.size} functions: ${Array.from(allowedShortNames).join(', ')}`);
         availableFunctions = availableFunctions.filter(f => {
             // Permitir todas las funciones locales y solo las MCP permitidas
-            return !this.isMCPFunction(f.name) || allowedShortNames.has(f.name);
+            const allowed = !this.isMCPFunction(f.name) || allowedShortNames.has(f.name);
+            console.log(`🔧 Function ${f.name}: isMCP=${this.isMCPFunction(f.name)}, allowed=${allowed}`);
+            return allowed;
         });
+        console.log(`🔧 After filtering: ${availableFunctions.length} functions available`);
+    } else {
+        console.log(`🔧 LlamaFunctionsMCP: No preset filtering applied (usePreset: ${this.activeUsePreset}, preset: ${!!this.activeMCPPreset})`);
     }
     // --- End Preset Filtering ---
 
