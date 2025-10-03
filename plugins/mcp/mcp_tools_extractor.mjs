@@ -12,9 +12,10 @@ export class MCPToolsExtractor {
     this.transport = null;
     this.serverInfo = null;
     this.isConnected = false;
+    this.originalServerName = null; // Store original configured name
   }
 
-  async connectToServer(serverConfig, transportType = 'http') {
+  async connectToServer(serverConfig, transportType = 'http', originalServerName = null) {
     try {
 
       if (transportType === 'stdio') {
@@ -59,9 +60,12 @@ export class MCPToolsExtractor {
       await Promise.race([connectPromise, timeoutPromise]);
       this.isConnected = true;
 
-      // Crear información básica del servidor (no hay getServerInfo en el SDK)
+      // Store original server name if provided
+      this.originalServerName = originalServerName;
+
+      // Create server info with proper naming
       this.serverInfo = {
-        name: 'mcp-server', // nombre genérico
+        name: originalServerName || 'mcp-server',
         version: 'unknown',
         url: typeof serverConfig === 'string' ? serverConfig : serverConfig.url
       };
@@ -173,8 +177,13 @@ export class MCPToolsExtractor {
   }
 
   getServerName() {
+    // Return original configured name if available
+    if (this.originalServerName) {
+      return this.originalServerName;
+    }
+    
+    // Fallback to extracting from URL if no original name
     if (this.serverInfo?.url) {
-      // Extraer hostname de la URL
       try {
         const url = new URL(this.serverInfo.url);
         return url.hostname.replace(/\./g, '-');

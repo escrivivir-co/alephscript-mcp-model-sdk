@@ -19,27 +19,27 @@ export class MCPMixin {
   async registerMCPServer(serverName, serverConfig, transportType = 'http') {
     try {
       console.log(`🔧 MCPMixin: Registrando servidor ${serverName} en ${serverConfig}...`);
-      
+
       const result = await this.mcpHandler.registerServer(serverName, serverConfig, transportType);
-      
+
       // Intentar obtener información detallada del servidor usando get_server_info
       let actualServerName = result.serverName;
       let serverDetails = {};
-      
+
       try {
         // Buscar si existe la tool get_server_info
         const allFunctions = this.mcpHandler.getAllFunctions();
         const serverFunctions = allFunctions[result.serverName];
-        
+
         if (serverFunctions && serverFunctions['get_server_info']) {
           console.log(`🔍 Obteniendo información detallada del servidor ${result.serverName}...`);
-          
+
           const serverInfoResult = await this.mcpHandler.executeFunction(
-            result.serverName, 
-            'get_server_info', 
+            result.serverName,
+            'get_server_info',
             {}
           );
-          
+
           if (serverInfoResult.success && serverInfoResult.result) {
             try {
               const serverInfo = JSON.parse(serverInfoResult.result);
@@ -56,7 +56,7 @@ export class MCPMixin {
       } catch (infoError) {
         console.warn(`⚠️ No se pudo obtener server info de ${result.serverName}:`, infoError.message);
       }
-      
+
       // Actualizar el registro con la información correcta
       this.mcpServers.set(actualServerName, {
         config: serverConfig,
@@ -65,9 +65,9 @@ export class MCPMixin {
         originalName: result.serverName,
         serverDetails: serverDetails
       });
-      
+
       console.log(`✅ Servidor MCP ${actualServerName} registrado exitosamente`);
-      
+
       return {
         ...result,
         actualServerName,
@@ -89,11 +89,11 @@ export class MCPMixin {
       'state-machine-server': 'state',
       'localhost': 'local'
     };
-    
+
     if (knownMappings[serverName]) {
       return knownMappings[serverName];
     }
-    
+
     if (serverName.includes('-')) {
       return serverName.split('-')
         .map(word => word.charAt(0))
@@ -101,39 +101,39 @@ export class MCPMixin {
         .toLowerCase()
         .substring(0, 4);
     }
-    
+
     return serverName.toLowerCase().substring(0, 4);
   }
 
   _buildMCPFunctionMapping() {
     const mcpFunctions = this.mcpHandler.getAllFunctions();
     const mcpFunctionMap = {};
-    
+
     this.functionToServerMap.clear();
-    
+
     for (const [originalServerName, serverFunctions] of Object.entries(mcpFunctions)) {
 
       let actualServerName = originalServerName;
-      
+
       for (const [registeredName, serverInfo] of this.mcpServers.entries()) {
         if (serverInfo.originalName === originalServerName) {
           actualServerName = registeredName;
           break;
         }
       }
-      
+
       const shortPrefix = this._generateShortPrefix(actualServerName);
-      
+
       for (const [toolName, functionDef] of Object.entries(serverFunctions)) {
 
         const shortFunctionName = `${shortPrefix}_${toolName}`;
-        
+
         mcpFunctionMap[shortFunctionName] = {
           description: functionDef.description,
           parameters: functionDef.parameters,
           handler: functionDef.handler
         };
-        
+
         this.functionToServerMap.set(shortFunctionName, {
           serverName: actualServerName,
           originalServerName: originalServerName,
@@ -142,7 +142,7 @@ export class MCPMixin {
         });
       }
     }
-    
+
     return mcpFunctionMap;
   }
 
@@ -156,7 +156,7 @@ export class MCPMixin {
     }
 
     console.log(`🔄 MCPMixin: Ejecutando función MCP ${functionName} -> ${serverInfo.toolName} en ${serverInfo.serverName}`);
-    
+
     try {
       // Ejecutar en el servidor MCP correcto usando originalServerName para routing interno
       const mcpResult = await this.mcpHandler.executeFunction(
@@ -164,10 +164,10 @@ export class MCPMixin {
         serverInfo.toolName,
         params
       );
-      
+
       if (mcpResult.success) {
         // console.log(`✅ MCPMixin: ${functionName} success!`);
-        
+
         // Almacenar resultado para debugging
         this.lastMCPResults.push({
           name: functionName,
@@ -175,7 +175,7 @@ export class MCPMixin {
           result: mcpResult.result,
           serverInfo
         });
-        
+
         return mcpResult.result;
       } else {
         throw new Error(`MCP function failed: ${mcpResult.error}`);
@@ -195,7 +195,7 @@ export class MCPMixin {
     }
 
     console.log(`🔧 MCPMixin: Registrando ${mcpServers.length} servidores MCP...`);
-    
+
     const mcpRegistrations = mcpServers.map(async (serverConfig) => {
       const { name, url, transport = 'http' } = serverConfig;
       console.log(`🔧 MCPMixin: Register server ${name} at ${url}...`);
@@ -203,7 +203,7 @@ export class MCPMixin {
     });
 
     const mcpResults = await Promise.allSettled(mcpRegistrations);
-    
+
     // Reportar resultados
     mcpResults.forEach((result, index) => {
       const serverConfig = mcpServers[index];
@@ -225,7 +225,7 @@ export class MCPMixin {
    */
   getMCPStats() {
     const mcpFunctions = this.mcpHandler.getAllFunctions();
-    
+
     const mcpCount = Object.values(mcpFunctions).reduce((count, serverFunctions) => {
       return count + Object.keys(serverFunctions).length;
     }, 0);
@@ -309,7 +309,7 @@ export class MCPMixin {
 
     // Formato Zeus: { items: ["function_name1", "function_name2"] }
     if (mcpPreset.items && Array.isArray(mcpPreset.items)) {
-      console.log("��� MCPMixin: Using Zeus preset format (items array)");
+      console.log("��� MCPMixin: Using Zeus preset format (items array)");
       for (const functionName of mcpPreset.items) {
         // Para Zeus, buscar directamente por nombre de función en el mapping
         for (const [shortName, mapping] of this.functionToServerMap.entries()) {
@@ -327,15 +327,23 @@ export class MCPMixin {
       return allowedFunctions;
     }
 
-    console.log("��� MCPMixin: Using SLMo42 preset format (selectedItems array)");
+    console.log("🧩 MCPMixin: Using SLMo42 preset format (selectedItems array)");
     const toolItems = mcpPreset.selectedItems.filter(item => item.type === 'tool');
 
     for (const item of toolItems) {
-      // Encontrar el shortFunctionName correspondiente
-      for (const [shortName, mapping] of this.functionToServerMap.entries()) {
-        if (mapping.originalServerName === item.serverName && mapping.toolName === item.name) {
-          allowedFunctions.add(shortName);
-          break; // Pasar al siguiente item del preset
+      if (item.serverName) {
+        // Reutilizar la lógica existente de generación de prefijos
+        const shortPrefix = this._generateShortPrefix(item.serverName);
+        const shortFunctionName = `${shortPrefix}_${item.name}`;
+        allowedFunctions.add(shortFunctionName);
+        console.log(`🔧 MCPMixin: Mapped ${item.serverName}.${item.name} → ${shortFunctionName}`);
+      } else {
+        // Fallback: buscar en el mapping existente
+        for (const [shortName, mapping] of this.functionToServerMap.entries()) {
+          if (mapping.originalServerName === item.serverName && mapping.toolName === item.name) {
+            allowedFunctions.add(shortName);
+            break;
+          }
         }
       }
     }

@@ -189,6 +189,94 @@
         "prompts": 0,
         "total": 3
       }
+    },
+    {
+      "name": "S09-Debug-Test-Preset",
+      "items": [
+        {
+          "serverName": "localhost",
+          "type": "prompt",
+          "name": "list_prompts"
+        },
+        {
+          "serverName": "localhost",
+          "type": "tool",
+          "name": "get_system_info"
+        },
+        {
+          "serverName": "localhost",
+          "type": "tool",
+          "name": "server_status"
+        }
+      ],
+      "createdAt": "2025-10-01T22:29:50.619Z",
+      "itemsCount": {
+        "tools": 2,
+        "resources": 0,
+        "prompts": 1,
+        "total": 3
+      }
+    },
+    {
+      "name": "test-zeus-integration",
+      "items": [
+        {
+          "serverName": "localhost",
+          "type": "tool",
+          "name": "get_server_status"
+        }
+      ],
+      "createdAt": "2025-10-02T23:28:34.661Z",
+      "itemsCount": {
+        "tools": 1,
+        "resources": 0,
+        "prompts": 0,
+        "total": 1
+      }
+    },
+    {
+      "name": "Fixed-Sync-Test-Preset",
+      "items": [
+        {
+          "serverName": "localhost",
+          "type": "tool",
+          "name": "get_server_status"
+        },
+        {
+          "serverName": "localhost",
+          "type": "tool",
+          "name": "get_server_info"
+        }
+      ],
+      "createdAt": "2025-10-02T23:38:55.059Z",
+      "itemsCount": {
+        "tools": 2,
+        "resources": 0,
+        "prompts": 0,
+        "total": 2
+      }
+    },
+    {
+      "name": "Server-Name-Fix-Test",
+      "items": [
+        {
+          "serverName": "devops-mcp-server",
+          "type": "tool",
+          "name": "get_server_status"
+        },
+        {
+          "serverName": "devops-mcp-server",
+          "type": "tool",
+          "name": "get_server_info"
+        }
+      ],
+      "createdAt": "2025-10-02T23:50:29.143Z",
+      "itemsCount": {
+        "tools": 2,
+        "resources": 0,
+        "prompts": 0,
+        "total": 2
+      }
     }
   ]
 }

@@ -1,9 +1,8 @@
 {
-    "servers": [
-        {
-            "name": "devops-mcp",
-            "url": "http://localhost:3003",
-            "transport": "http"
+    "servers": {
+        "devops-mcp-server": {
+            "type": "http",
+            "url": "http://localhost:3003"
         }
-    ]
+    }
 }

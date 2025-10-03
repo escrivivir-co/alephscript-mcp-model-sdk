@@ -12,11 +12,12 @@ export class MCPFunctionHandler {
   async registerServer(serverName, serverConfig, transportType = 'http') {
     try {
       const extractor = new MCPToolsExtractor();
-      await extractor.connectToServer(serverConfig, transportType);
+      await extractor.connectToServer(serverConfig, transportType, serverName);
 
       const metadata = await extractor.extractCompleteMetadata();
 
-      const actualServerName = extractor.getServerName();
+      // Use the original configured server name instead of derived name
+      const actualServerName = serverName;
       const transformer = new MCPSchemaTransformer(actualServerName);
 
       const { functionConfig } = transformer.transformCompleteMetadata(metadata);
