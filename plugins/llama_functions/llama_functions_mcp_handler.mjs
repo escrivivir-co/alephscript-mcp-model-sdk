@@ -181,8 +181,9 @@ export class LlamaFunctionMCPHandler extends LlamaFunctionHandler {
       await this.initialize();
     }
 
+    console.log("The options received in chat are:", options);
     // Store preset and flag for this chat instance
-    this.activeMCPPreset = options.mcpPreset || null;
+    this.activeMCPPreset = options.mcpPreset ||  options.mcpPresetName || null;
     this.activeUsePreset = options.usePreset || false;
 
     // Verificar que todos los componentes estén disponibles
@@ -381,8 +382,10 @@ export class LlamaFunctionMCPHandler extends LlamaFunctionHandler {
       );
 
       // --- Preset Enforcement ---
+      console.log(`🔧 Checking preset enforcement for function, functionName:${functionName}/isMCPFunction(functionName):${this.isMCPFunction(functionName)}/activeMCPPreset: ${this.activeMCPPreset}`);
       if (this.activeUsePreset && this.isMCPFunction(functionName)) {
           const allowedShortNames = this._buildAllowedFunctionsSet(this.activeMCPPreset);
+          console.log(`🔧 Allowed functions in preset: ${Array.from(allowedShortNames).join(', ')}`);
           if (!allowedShortNames.has(functionName)) {
               console.warn(`🚫 MCP function call blocked by preset: ${functionName}`);
               processedText = processedText.replace(

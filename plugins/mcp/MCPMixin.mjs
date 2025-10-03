@@ -309,6 +309,7 @@ export class MCPMixin {
       return allowedFunctions;
     }
 
+    console.log("🔍 DEBUG: Processing preset:>>>>>>>>>>>>>>>>>", mcpPreset);
     // Formato Zeus: { items: [{serverName, type, name}] }
     if (mcpPreset.items && Array.isArray(mcpPreset.items)) {
       console.log("🧩 MCPMixin: Using Zeus preset format (items array)");
