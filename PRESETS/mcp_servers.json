@@ -1,8 +1,36 @@
 {
     "servers": {
+        "mcp-service-launcher": {
+            "type": "http",
+            "url": "http://localhost:3050"
+        },
+        "aaia-mcp-server": {
+            "type": "http",
+            "url": "http://localhost:3007"
+        },
+        "state-machine-server": {
+            "type": "http",
+            "url": "http://localhost:3004"
+        },
+        "wiki-mcp-browser": {
+            "type": "http",
+            "url": "http://localhost:3002"
+        },
         "devops-mcp-server": {
             "type": "http",
             "url": "http://localhost:3003"
+        },
+        "prolog-mcp-server": {
+            "type": "http",
+            "url": "http://localhost:3006"
+        },
+        "typed-prompt-mcp-server": {
+            "type": "http",
+            "url": "http://localhost:3020"
+        },
+        "firehose-mcp-server": {
+            "type": "http",
+            "url": "http://localhost:3008"
         }
     }
 }
